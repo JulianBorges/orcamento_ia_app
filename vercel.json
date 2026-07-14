@@ -1,11 +1,16 @@
 {
   "version": 2,
-  "buildCommand": "npm --prefix=frontend install && npm --prefix=frontend run build",
-  "outputDirectory": "frontend/.next",
   "framework": "nextjs",
+  "root": "frontend",
   "functions": {
     "api/index.py": {
-      "runtime": "@vercel/python@3.1.0"
+      "runtime": "@vercel/python"
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api/index.py"
+    }
+  ]
 }
