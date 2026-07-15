@@ -13,16 +13,34 @@ active_jobs: Dict[str, Any] = {}
 openai_semaphore = asyncio.Semaphore(5)
 
 async def process_item_with_semaphore(item: dict, ai_function, *args):
-    """Executa uma função de IA respeitando o limite do semáforo."""
+    """Executa uma função de IA respeitando o limite do semáforo com retentativas (Retry Logic)."""
+    max_retries = 3
     async with openai_semaphore:
-        try:
-            # Simulando o tempo de rede e limitando rate limits
-            await asyncio.sleep(0.1) 
-            # Aqui chamaremos a função real (ex: analisar_item_ia_async)
-            resultado = await ai_function(item, *args)
-            return {"id": item.get('id', 'N/A'), "status": "SUCESSO", "resultado": resultado}
-        except Exception as e:
-            return {"id": item.get('id', 'N/A'), "status": "ERRO", "erro": str(e)}
+        for attempt in range(max_retries):
+            try:
+                # Simulando o tempo de rede e limitando rate limits
+                await asyncio.sleep(0.5) 
+                resultado = await ai_function(item, *args)
+                
+                # Se a função interna retornou ERRO por Rate Limit, lançamos a exceção para ativar o Retry
+                if isinstance(resultado, dict) and resultado.get("status") == "ERRO":
+                    erro_str = resultado.get("erro", "").lower()
+                    if "429" in erro_str or "rate limit" in erro_str or "502" in erro_str or "503" in erro_str:
+                        raise Exception(f"RateLimit ou Timeout: {erro_str}")
+                    else:
+                        # Se for um erro técnico de sintaxe ou banco, não adianta tentar de novo
+                        return {"id": item.get('id', 'N/A'), "status": "ERRO", "erro": resultado.get("erro")}
+                
+                return {"id": item.get('id', 'N/A'), "status": "SUCESSO", "resultado": resultado}
+            
+            except Exception as e:
+                erro_str = str(e).lower()
+                if "429" in erro_str or "rate limit" in erro_str or "502" in erro_str or "503" in erro_str:
+                    if attempt < max_retries - 1:
+                        # Exponential backoff: espera 2, 4, 8 segundos
+                        await asyncio.sleep(2 ** (attempt + 1))
+                        continue
+                return {"id": item.get('id', 'N/A'), "status": "ERRO", "erro": str(e)}
 
 async def background_batch_processor(job_id: str, df: pd.DataFrame, ai_function, *args):
     """Roda em background fatiando o DataFrame e reportando o progresso no active_jobs."""

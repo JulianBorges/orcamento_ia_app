@@ -123,6 +123,7 @@ export default function Home() {
                                  const analise = res.analise || {};
                                  const meta = res.metadados || {};
                                  const isApproved = analise.status?.includes('ACEITO');
+                                 const aiError = analise.erro || res.erro || r.erro;
                                  
                                  return {
                                      id: String(idx),
@@ -135,7 +136,7 @@ export default function Home() {
                                      valorUnit: isApproved ? (meta.custo || 0.0) : 0.0,
                                      total: (isApproved ? (meta.custo || 0.0) : 0.0) * (res.quantidade_original || 1),
                                      ai_status: analise.status || res.status || 'ERRO',
-                                     ai_justificativa: analise.justificativa || res.justificativa || r.erro || 'Falha ao processar'
+                                     ai_justificativa: analise.justificativa || res.justificativa || aiError || 'Falha ao processar'
                                  };
                             });
                             setTableData(prev => {
