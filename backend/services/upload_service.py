@@ -10,7 +10,7 @@ from services.ai_service import buscar_semelhantes_pinecone_async, fluxo_multi_a
 active_jobs: Dict[str, Any] = {}
 
 # Semáforo global para não estourar os limites de concorrência da OpenAI
-openai_semaphore = asyncio.Semaphore(50)
+openai_semaphore = asyncio.Semaphore(5)
 
 async def process_item_with_semaphore(item: dict, ai_function, *args):
     """Executa uma função de IA respeitando o limite do semáforo."""
