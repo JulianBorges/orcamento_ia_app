@@ -12,7 +12,7 @@ from models.schemas import StatelessBatchItem
 # Reduzido para 5 para garantir que a IA processe lotes massivos (+5000) sem falhar.
 openai_semaphore = asyncio.Semaphore(5)
 
-async def process_item_with_semaphore(item: dict, ai_function, *args):
+async def process_item_with_semaphore(item: StatelessBatchItem, ai_function, *args):
     """Executa uma função de IA respeitando o limite do semáforo com retentativas (Retry Logic)."""
     max_retries = 6
     async with openai_semaphore:
@@ -29,9 +29,9 @@ async def process_item_with_semaphore(item: dict, ai_function, *args):
                         raise Exception(f"RateLimit/Timeout: {erro_str}")
                     else:
                         # Erros técnicos/banco (não-rede) não adiantam tentar de novo
-                        return {"id": item.get('id', 'N/A'), "status": "ERRO", "erro": resultado.get("erro")}
+                        return {"id": item.id, "status": "ERRO", "erro": resultado.get("erro")}
                 
-                return {"id": item.get('id', 'N/A'), "status": "SUCESSO", "resultado": resultado}
+                return {"id": item.id, "status": "SUCESSO", "resultado": resultado}
             
             except Exception as e:
                 erro_str = str(e).lower()
@@ -41,7 +41,7 @@ async def process_item_with_semaphore(item: dict, ai_function, *args):
                         # Exponential backoff agressivo para salvar jobs grandes
                         await asyncio.sleep(2 ** (attempt + 1))
                         continue
-                return {"id": item.get('id', 'N/A'), "status": "ERRO", "erro": str(e)}
+                return {"id": item.id, "status": "ERRO", "erro": str(e)}
 
 async def processar_real_ai(item: StatelessBatchItem):
     descricao = item.descricao
@@ -80,13 +80,7 @@ async def processar_lote_stateless_async(itens: list[StatelessBatchItem]):
     """Recebe um lote (chunk) enviado pelo frontend e processa sincronicamente usando o semáforo interno."""
     
     async def run_task(item):
-        # process_item_with_semaphore espera: item, ai_function, *args
-        # Mas nossa processar_real_ai já faz tudo e queremos passar o item completo para ela.
-        # process_item_with_semaphore envolve a chamada no semáforo e lida com Retry/RateLimits.
-        # Nós usamos o `__dict__` ou enviamos o item inteiro:
-        res = await process_item_with_semaphore({"id": item.id}, processar_real_ai, item)
-        # process_item_with_semaphore devolve: {"id": "...", "status": "...", "resultado": ... ou "erro": ...}
-        # Se for sucesso, res["resultado"] tem o payload completo do processar_real_ai
+        res = await process_item_with_semaphore(item, processar_real_ai)
         return res
 
     tasks = [asyncio.create_task(run_task(it)) for it in itens]
