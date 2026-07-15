@@ -87,23 +87,22 @@ export default function Home() {
         const data = await res.json();
         
         if (data.job_id) {
-            // Conecta no stream SSE via Proxy
-            const evtSource = new EventSource(`/api/orcamento/stream-lote/${data.job_id}`);
-            
-            evtSource.onmessage = async (event) => {
+            // Smart Polling: Verifica o progresso a cada 3 segundos sem travar a conexão (Imune ao timeout da Vercel)
+            const pollInterval = setInterval(async () => {
                 try {
-                    const streamData = JSON.parse(event.data);
-                    
-                    if (streamData.error) {
-                        evtSource.close();
-                        setIsProcessing(false);
+                    const progressRes = await fetch(`/api/orcamento/job/${data.job_id}/progress`);
+                    if (!progressRes.ok) {
+                        console.error("Falha ao buscar progresso. Status:", progressRes.status);
+                        // Tenta novamente no próximo tick caso seja uma oscilação rápida de rede
                         return;
                     }
                     
-                    setUploadProgress(streamData.progress);
+                    const progressData = await progressRes.json();
                     
-                    if (streamData.status === "FINALIZADO" || streamData.status === "ERRO") {
-                        evtSource.close();
+                    setUploadProgress(progressData.progress);
+                    
+                    if (progressData.status === "FINALIZADO" || progressData.status === "ERRO") {
+                        clearInterval(pollInterval);
                         
                         // Busca os resultados reais gerados pela Inteligência Artificial
                         const resultRes = await fetch(`/api/orcamento/job/${data.job_id}/resultados`);
@@ -119,11 +118,11 @@ export default function Home() {
                         if (resultData.resultados) {
                             // Converte os resultados do backend pro formato da Tabela
                             const parsedData: BudgetItem[] = resultData.resultados.map((r: any, idx: number) => {
-                                 const res = r.resultado || {};
+                                 const res = r?.resultado || {};
                                  const analise = res.analise || {};
                                  const meta = res.metadados || {};
                                  const isApproved = analise.status?.includes('ACEITO');
-                                 const aiError = analise.erro || res.erro || r.erro;
+                                 const aiError = analise.erro || res.erro || r?.erro;
                                  
                                  return {
                                      id: String(idx),
@@ -143,7 +142,7 @@ export default function Home() {
                                 // Ajusta IDs se for append para evitar duplicação
                                 const finalData = append ? [...prev] : [];
                                 const startIndex = finalData.length;
-                                const parsedWithUniqueIds = parsedData.map((r, i) => ({
+                                const parsedWithUniqueIds = parsedData.map((r: BudgetItem, i: number) => ({
                                     ...r,
                                     id: `r_${Date.now()}_${startIndex + i}`,
                                     item: `1.${startIndex + i + 1}`
@@ -158,19 +157,10 @@ export default function Home() {
                         }, 500);
                     }
                 } catch (err) {
-                    console.error("Erro no parse do SSE:", err, "Raw data:", event.data);
-                    evtSource.close();
-                    setIsProcessing(false);
-                    setUploadProgress(null);
+                    console.error("Erro durante o Polling:", err);
+                    // Não damos clearInterval aqui para que a rede tenha a chance de se recuperar em oscilações locais
                 }
-            };
-            
-            evtSource.onerror = (err) => {
-                console.error("Erro na conexão SSE:", err);
-                evtSource.close();
-                setIsProcessing(false);
-                setUploadProgress(null);
-            };
+            }, 3000); // Poll a cada 3 segundos
         }
     } catch (err) {
         console.error(err);

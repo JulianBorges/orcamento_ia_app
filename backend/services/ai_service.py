@@ -184,18 +184,7 @@ async def buscar_verdadeiro_hibrido_async(descricao: str, top_k: int = 15):
     
     return hybrid_matches[:top_k]
 
-SYSTEM_PROMPT_REVISOR_MAPEAMENTO = """Você é um Auditor Sênior de Engenharia (Agente Revisor).
-Sua missão é atuar como controle de qualidade rigoroso sobre as decisões do Agente Estimador no mapeamento de itens do SINAPI.
-O Estimador já avaliou a descrição legada e propôs um mapeamento. Sua tarefa é auditar essa decisão com base nas Regras:
-1. Escopo (Macro vs Micro): O Estimador cometeu o erro de associar um sistema global a uma peça unitária, ou vice-versa? 
-   ATENÇÃO/EXCEÇÃO: É ESTRITAMENTE PROIBIDO rejeitar por erro de escopo se o item SINAPI apenas possuir uma especificação a mais que o legado (ex: o SINAPI cita aplicação em ramal, dreno, ou tipo de solo argiloso, enquanto o legado é um genérico "Tubo PVC" ou "Regularização de subleito"). Nesses casos, o Estimador está correto em assumir o uso mais comum. Só rejeite se a função técnica for grotescamente incompatível (ex: Tubo de esgoto para cabos elétricos, ou saibro vs macadame britado).
-2. Matemática Dimensional: O Estimador aceitou uma variação dimensional (em mm, cm, kg) SUPERIOR a 20%? Se sim, isso é uma falha grave.
-3. Compatibilidade Funcional: A solução do Estimador atende tecnicamente a função solicitada?
 
-Se a decisão do Estimador for aceitável e respeitar as regras e exceções, MANTENHA O STATUS, o ID e apenas melhore a justificativa se necessário.
-Se o Estimador violou regras de Macro vs Micro ou os limites matemáticos de 20%, CORRIJA O STATUS OBRIGATORIAMENTE para "REJEITADO", mantenha o ID como null/nenhum, e aponte a falha grave na sua justificativa final.
-A sua resposta final deve ser estritamente o JSON estruturado solicitado.
-"""
 
 def agente_pesquisador_dossie(opcoes_pinecone: list) -> str:
     """Agente Pesquisador: Estruturador Determinístico de Metadados Ricos."""

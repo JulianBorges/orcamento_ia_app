@@ -76,6 +76,20 @@ async def stream_lote(job_id: str):
     """Conexão persistente (SSE) que envia a barra de progresso (0-100%) pro Frontend."""
     return StreamingResponse(stream_job_progress(job_id), media_type="text/event-stream")
 
+@router.get("/orcamento/job/{job_id}/progress")
+async def get_job_progress(job_id: str):
+    """Endpoint de Smart Polling para buscar o status atual sem travar a conexão HTTP na Vercel."""
+    if job_id not in active_jobs:
+        raise HTTPException(status_code=404, detail="Job não encontrado")
+    
+    job = active_jobs[job_id]
+    return {
+        "status": job["status"],
+        "progress": job.get("progress", 0.0),
+        "completed": job.get("completed", 0),
+        "total": job.get("total", 0)
+    }
+
 @router.get("/orcamento/job/{job_id}/resultados")
 async def get_job_resultados(job_id: str):
     """Busca os resultados finais armazenados em memória após a conclusão."""

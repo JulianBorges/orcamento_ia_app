@@ -9,8 +9,9 @@ from services.ai_service import buscar_verdadeiro_hibrido_async, fluxo_multi_age
 # In-memory store para os jobs de processamento (MVP). Em prod: Redis.
 active_jobs: Dict[str, Any] = {}
 
-# Semáforo global para não estourar os limites de concorrência da OpenAI
-openai_semaphore = asyncio.Semaphore(15)
+# Semáforo global para não estourar os limites de concorrência da OpenAI (RPM)
+# Reduzido para 5 para garantir que a IA processe lotes massivos (+5000) sem falhar.
+openai_semaphore = asyncio.Semaphore(5)
 
 async def process_item_with_semaphore(item: dict, ai_function, *args):
     """Executa uma função de IA respeitando o limite do semáforo com retentativas (Retry Logic)."""
@@ -22,22 +23,23 @@ async def process_item_with_semaphore(item: dict, ai_function, *args):
                 await asyncio.sleep(0.5) 
                 resultado = await ai_function(item, *args)
                 
-                # Se a função interna retornou ERRO por Rate Limit, lançamos a exceção para ativar o Retry
+                # Se a função interna retornou ERRO por Rate Limit ou Timeout, lançamos a exceção para ativar o Retry
                 if isinstance(resultado, dict) and resultado.get("status") == "ERRO":
                     erro_str = resultado.get("erro", "").lower()
-                    if "429" in erro_str or "rate limit" in erro_str or "502" in erro_str or "503" in erro_str:
-                        raise Exception(f"RateLimit ou Timeout: {erro_str}")
+                    if any(term in erro_str for term in ["429", "rate limit", "502", "503", "timeout", "timed out", "connection"]):
+                        raise Exception(f"RateLimit/Timeout: {erro_str}")
                     else:
-                        # Se for um erro técnico de sintaxe ou banco, não adianta tentar de novo
+                        # Erros técnicos/banco (não-rede) não adiantam tentar de novo
                         return {"id": item.get('id', 'N/A'), "status": "ERRO", "erro": resultado.get("erro")}
                 
                 return {"id": item.get('id', 'N/A'), "status": "SUCESSO", "resultado": resultado}
             
             except Exception as e:
                 erro_str = str(e).lower()
-                if "429" in erro_str or "rate limit" in erro_str or "502" in erro_str or "503" in erro_str:
+                # Considera Rate Limits, Timeouts e problemas de conexão da OpenAI como passíveis de Retry
+                if any(term in erro_str for term in ["429", "rate limit", "502", "503", "timeout", "timed out", "connection", "overloaded"]):
                     if attempt < max_retries - 1:
-                        # Exponential backoff: espera 2, 4, 8 segundos
+                        # Exponential backoff agressivo para salvar jobs grandes
                         await asyncio.sleep(2 ** (attempt + 1))
                         continue
                 return {"id": item.get('id', 'N/A'), "status": "ERRO", "erro": str(e)}
