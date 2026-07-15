@@ -4,7 +4,7 @@ import numpy as np
 import io
 import uuid
 from typing import Dict, Any
-from services.ai_service import buscar_semelhantes_pinecone_async, fluxo_multi_agentes_mapeamento_async
+from services.ai_service import buscar_verdadeiro_hibrido_async, fluxo_multi_agentes_mapeamento_async
 
 # In-memory store para os jobs de processamento (MVP). Em prod: Redis.
 active_jobs: Dict[str, Any] = {}
@@ -112,7 +112,7 @@ def start_upload_job(file_bytes: bytes) -> str:
             return {"status": "TITULO_VAZIO", "quantidade_original": quantidade}
             
         try:
-            matches = await buscar_semelhantes_pinecone_async(descricao, top_k=5)
+            matches = await buscar_verdadeiro_hibrido_async(descricao, top_k=5)
             if not matches or matches[0]['score'] < 0.3:
                 return {"status": "REJEITADO_FILTRO_MATEMATICO", "justificativa": "Sem similaridade na base.", "quantidade_original": quantidade, "descricao_original": descricao}
                 
