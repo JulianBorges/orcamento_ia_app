@@ -10,11 +10,11 @@ from services.ai_service import buscar_verdadeiro_hibrido_async, fluxo_multi_age
 active_jobs: Dict[str, Any] = {}
 
 # Semáforo global para não estourar os limites de concorrência da OpenAI
-openai_semaphore = asyncio.Semaphore(5)
+openai_semaphore = asyncio.Semaphore(15)
 
 async def process_item_with_semaphore(item: dict, ai_function, *args):
     """Executa uma função de IA respeitando o limite do semáforo com retentativas (Retry Logic)."""
-    max_retries = 3
+    max_retries = 6
     async with openai_semaphore:
         for attempt in range(max_retries):
             try:

@@ -230,30 +230,13 @@ async def fluxo_multi_agentes_mapeamento_async(descricao_legada: str, opcoes_pin
             {"role": "user", "content": f"Descrição Original do Projeto:\n{descricao_legada}\n\nDossiê das Opções SINAPI:\n{dossie_texto}\n\nFaça o mapeamento obedecendo estritamente às Regras de 20% e Escopo."}
         ],
         response_format=AnaliseItem,
+        max_tokens=800,
     )
     analise_estimador = completion_est.choices[0].message.parsed
     
-    # 3. Agente Revisor (Audita a decisão matemática e de escopo)
-    prompt_auditoria = (
-        f"Item Solicitado Originalmente: {descricao_legada}\n\n"
-        f"Opções disponíveis no SINAPI (Dossiê Técnico):\n{dossie_texto}\n\n"
-        f"DECISÃO PROPOSTA PELO ESTIMADOR PARA AVALIAÇÃO:\n"
-        f"- ID Selecionado: {analise_estimador.codigo_selecionado}\n"
-        f"- Status: {analise_estimador.status}\n"
-        f"- Justificativa Original: {analise_estimador.justificativa}\n\n"
-        f"Faça a sua auditoria implacável. Se ele aprovou algo fora do escopo ou com erro dimensional >20%, REJEITE a proposta substituindo o status, limpando o ID selecionado e apontando a falha."
-    )
-    
-    completion_rev = await async_openai_client.beta.chat.completions.parse(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT_REVISOR_MAPEAMENTO},
-            {"role": "user", "content": prompt_auditoria}
-        ],
-        response_format=AnaliseItem,
-    )
-    
-    return completion_rev.choices[0].message.parsed
+    # Com o novo Motor Híbrido filtrando cirurgicamente as 5 melhores opções,
+    # o Agente Revisor se tornou redundante. O Estimador tem precisão suficiente.
+    return analise_estimador
 
 # ========================================================
 # MOTOR MULTI-AGENTES DE ENGENHARIA (FASE 2 - PLANO V2)
