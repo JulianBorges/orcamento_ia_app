@@ -2,6 +2,7 @@
 import { useState, useRef, useMemo, useEffect } from "react";
 import { UploadCloud, Loader2, Settings, Plus, Download, Trash2, AlertCircle } from "lucide-react";
 import { BudgetTable, BudgetItem } from "@/components/BudgetTable";
+import * as XLSX from "xlsx";
 
 export default function Home() {
   const [isLoaded, setIsLoaded] = useState(false);
@@ -67,105 +68,147 @@ export default function Home() {
     setShowUploadDialog(false);
     setPendingFile(null);
 
-    const formData = new FormData();
-    formData.append("file", file);
-
     try {
-        // Usa o Proxy do Next.js (/api) que redireciona automaticamente para o backend Python (sem problemas de CORS)
-        const res = await fetch(`/api/orcamento/upload-lote`, {
-            method: "POST",
-            body: formData,
-        });
+        const data = await file.arrayBuffer();
+        const workbook = XLSX.read(data, { type: "array" });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+        const jsonData = XLSX.utils.sheet_to_json(worksheet);
         
-        if (!res.ok) {
-            alert("O servidor backend parece estar indisponível ou reiniciando. Tente novamente em alguns segundos.");
+        const rows = jsonData.map((row: any, index: number) => {
+            let descricao = "";
+            let quantidade = 1.0;
+            
+            for (const key of Object.keys(row)) {
+                const lowerKey = String(key).toLowerCase();
+                if (['descricao', 'descrição', 'servico', 'serviço', 'nome'].includes(lowerKey)) {
+                    descricao = row[key];
+                }
+                if (['quant', 'quantidade', 'qtd', 'qnt'].includes(lowerKey)) {
+                    quantidade = parseFloat(row[key]) || 1.0;
+                }
+            }
+            if (!descricao) {
+                // Fallback to first property if description is empty
+                descricao = row[Object.keys(row)[0]] || "";
+            }
+            
+            return {
+                id: `r_${Date.now()}_${index}`,
+                descricao: String(descricao),
+                quantidade
+            };
+        });
+
+        // Atualiza a tabela imediatamente com os itens "PENDENTE"
+        const startIndex = append ? tableData.length : 0;
+        const initialItems: BudgetItem[] = rows.map((r, i) => ({
+             id: r.id,
+             item: `1.${startIndex + i + 1}`,
+             codigo: '-',
+             base: '-',
+             descricao: r.descricao,
+             und: '-',
+             quant: r.quantidade,
+             valorUnit: 0.0,
+             total: 0.0,
+             ai_status: 'PENDENTE',
+             ai_justificativa: 'Aguardando processamento...'
+        }));
+        
+        // Atualiza o estado da tabela sincronicamente antes de iniciar o loop assíncrono
+        let currentTableData = append ? [...tableData, ...initialItems] : initialItems;
+        setTableData(currentTableData);
+        
+        // Chunker (Lotes de 25)
+        const chunkSize = 25;
+        let completed = 0;
+        
+        for (let i = 0; i < rows.length; i += chunkSize) {
+            const chunk = rows.slice(i, i + chunkSize);
+            let retries = 3;
+            let success = false;
+            
+            // Marca o lote atual como "PROCESSANDO" visualmente
+            currentTableData = currentTableData.map(oldItem => {
+                if (chunk.some(c => c.id === oldItem.id)) {
+                    return { ...oldItem, ai_status: 'PROCESSANDO', ai_justificativa: 'Analisando via IA...' };
+                }
+                return oldItem;
+            });
+            setTableData([...currentTableData]);
+
+            while (retries > 0 && !success) {
+                try {
+                    const res = await fetch(`/api/orcamento/processar-lote-stateless`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ itens: chunk }),
+                    });
+                    
+                    if (!res.ok) throw new Error("Erro na API");
+                    
+                    const responseData = await res.json();
+                    
+                    if (responseData.resultados) {
+                        currentTableData = currentTableData.map(oldItem => {
+                            const resultRow = responseData.resultados.find((r: any) => r.id === oldItem.id);
+                            if (!resultRow) return oldItem;
+                            
+                            const resData = resultRow.resultado || {};
+                            const analise = resData.analise || {};
+                            const meta = resData.metadados || {};
+                            const isApproved = analise.status?.includes('ACEITO');
+                            const aiError = analise.erro || resData.erro || resultRow.erro;
+                            const aiStatus = analise.status || resultRow.status || 'ERRO';
+                            
+                            return {
+                                ...oldItem,
+                                codigo: isApproved ? (meta.codigo || '-') : '-',
+                                base: isApproved ? "SINAPI" : "-",
+                                descricao: isApproved ? (meta.descricao || oldItem.descricao) : oldItem.descricao,
+                                und: isApproved ? (meta.unidade || '-') : '-',
+                                valorUnit: isApproved ? (meta.custo || 0.0) : 0.0,
+                                total: (isApproved ? (meta.custo || 0.0) : 0.0) * oldItem.quant,
+                                ai_status: aiStatus,
+                                ai_justificativa: analise.justificativa || resData.justificativa || aiError || 'Falha ao processar'
+                            };
+                        });
+                        setTableData([...currentTableData]);
+                    }
+                    success = true;
+                } catch (err) {
+                    retries--;
+                    if (retries === 0) {
+                        // Marca lote como erro
+                        currentTableData = currentTableData.map(oldItem => {
+                             if (chunk.some(c => c.id === oldItem.id)) {
+                                 return { ...oldItem, ai_status: 'ERRO', ai_justificativa: 'Falha de conexão com a API' };
+                             }
+                             return oldItem;
+                        });
+                        setTableData([...currentTableData]);
+                    } else {
+                        // Espera 3 segundos antes do retry
+                        await new Promise(resolve => setTimeout(resolve, 3000));
+                    }
+                }
+            }
+            
+            completed += chunk.length;
+            setUploadProgress(Math.min(100, Math.round((completed / rows.length) * 100)));
+        }
+        
+        setTimeout(() => {
             setIsProcessing(false);
             setUploadProgress(null);
-            return;
-        }
+        }, 1000);
         
-        const data = await res.json();
-        
-        if (data.job_id) {
-            // Smart Polling: Verifica o progresso a cada 3 segundos sem travar a conexão (Imune ao timeout da Vercel)
-            const pollInterval = setInterval(async () => {
-                try {
-                    const progressRes = await fetch(`/api/orcamento/job/${data.job_id}/progress`);
-                    if (!progressRes.ok) {
-                        console.error("Falha ao buscar progresso. Status:", progressRes.status);
-                        // Tenta novamente no próximo tick caso seja uma oscilação rápida de rede
-                        return;
-                    }
-                    
-                    const progressData = await progressRes.json();
-                    
-                    setUploadProgress(progressData.progress);
-                    
-                    if (progressData.status === "FINALIZADO" || progressData.status === "ERRO") {
-                        clearInterval(pollInterval);
-                        
-                        // Busca os resultados reais gerados pela Inteligência Artificial
-                        const resultRes = await fetch(`/api/orcamento/job/${data.job_id}/resultados`);
-                        if (!resultRes.ok) {
-                            console.error("Falha ao buscar resultados. Status:", resultRes.status);
-                            setIsProcessing(false);
-                            setUploadProgress(null);
-                            return;
-                        }
-                        
-                        const resultData = await resultRes.json();
-                        
-                        if (resultData.resultados) {
-                            // Converte os resultados do backend pro formato da Tabela
-                            const parsedData: BudgetItem[] = resultData.resultados.map((r: any, idx: number) => {
-                                 const res = r?.resultado || {};
-                                 const analise = res.analise || {};
-                                 const meta = res.metadados || {};
-                                 const isApproved = analise.status?.includes('ACEITO');
-                                 const aiError = analise.erro || res.erro || r?.erro;
-                                 
-                                 return {
-                                     id: String(idx),
-                                     item: `1.${idx+1}`,
-                                     codigo: isApproved ? (meta.codigo || '-') : '-',
-                                     base: isApproved ? "SINAPI" : "-",
-                                     descricao: isApproved ? (meta.descricao || res.descricao_original) : res.descricao_original,
-                                     und: isApproved ? (meta.unidade || '-') : '-',
-                                     quant: res.quantidade_original || 1, 
-                                     valorUnit: isApproved ? (meta.custo || 0.0) : 0.0,
-                                     total: (isApproved ? (meta.custo || 0.0) : 0.0) * (res.quantidade_original || 1),
-                                     ai_status: analise.status || res.status || 'ERRO',
-                                     ai_justificativa: analise.justificativa || res.justificativa || aiError || 'Falha ao processar'
-                                 };
-                            });
-                            setTableData(prev => {
-                                // Ajusta IDs se for append para evitar duplicação
-                                const finalData = append ? [...prev] : [];
-                                const startIndex = finalData.length;
-                                const parsedWithUniqueIds = parsedData.map((r: BudgetItem, i: number) => ({
-                                    ...r,
-                                    id: `r_${Date.now()}_${startIndex + i}`,
-                                    item: `1.${startIndex + i + 1}`
-                                }));
-                                return [...finalData, ...parsedWithUniqueIds];
-                            });
-                        }
-                        
-                        setTimeout(() => {
-                            setIsProcessing(false);
-                            setUploadProgress(null);
-                        }, 500);
-                    }
-                } catch (err) {
-                    console.error("Erro durante o Polling:", err);
-                    // Não damos clearInterval aqui para que a rede tenha a chance de se recuperar em oscilações locais
-                }
-            }, 3000); // Poll a cada 3 segundos
-        }
     } catch (err) {
-        console.error(err);
+        console.error("Erro ao ler ou processar Excel:", err);
         setIsProcessing(false);
         setUploadProgress(null);
+        alert("Ocorreu um erro ao processar o arquivo Excel.");
     }
   };
 

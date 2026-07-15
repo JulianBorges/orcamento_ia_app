@@ -1,8 +1,7 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File
-from fastapi.responses import StreamingResponse
-from models.schemas import BatchRequest, ComposicaoRequest
+from fastapi import APIRouter, HTTPException
+from models.schemas import BatchRequest, ComposicaoRequest, StatelessBatchRequest
 from services.ai_service import buscar_verdadeiro_hibrido_async, fluxo_multi_agentes_mapeamento_async, gerar_composicao_agentes_async
-from services.upload_service import start_upload_job, stream_job_progress, active_jobs
+from services.upload_service import processar_lote_stateless_async
 import asyncio
 
 router = APIRouter()
@@ -60,46 +59,18 @@ async def processar_lote(request: BatchRequest):
     
     return {"resultados": resultados}
 
-@router.post("/orcamento/upload-lote")
-async def upload_lote(file: UploadFile = File(...)):
-    """Recebe a planilha Excel de 3000 linhas, joga pro processador assíncrono e devolve um Task ID."""
-    if not file.filename.endswith(('.xlsx', '.xls')):
-        raise HTTPException(status_code=400, detail="Arquivo deve ser um Excel (.xlsx)")
+@router.post("/orcamento/processar-lote-stateless")
+async def processar_lote_stateless(request: StatelessBatchRequest):
+    """Recebe um lote (chunk) e processa de forma síncrona/stateless, devolvendo os resultados."""
+    if not request.itens:
+        return {"resultados": []}
         
-    contents = await file.read()
-    job_id = start_upload_job(contents)
-    
-    return {"status": "SUCESSO", "job_id": job_id, "message": "Iniciando processamento em background."}
-
-@router.get("/orcamento/stream-lote/{job_id}")
-async def stream_lote(job_id: str):
-    """Conexão persistente (SSE) que envia a barra de progresso (0-100%) pro Frontend."""
-    return StreamingResponse(stream_job_progress(job_id), media_type="text/event-stream")
-
-@router.get("/orcamento/job/{job_id}/progress")
-async def get_job_progress(job_id: str):
-    """Endpoint de Smart Polling para buscar o status atual sem travar a conexão HTTP na Vercel."""
-    if job_id not in active_jobs:
-        raise HTTPException(status_code=404, detail="Job não encontrado")
-    
-    job = active_jobs[job_id]
-    return {
-        "status": job["status"],
-        "progress": job.get("progress", 0.0),
-        "completed": job.get("completed", 0),
-        "total": job.get("total", 0)
-    }
-
-@router.get("/orcamento/job/{job_id}/resultados")
-async def get_job_resultados(job_id: str):
-    """Busca os resultados finais armazenados em memória após a conclusão."""
-    if job_id not in active_jobs:
-        raise HTTPException(status_code=404, detail="Job não encontrado")
-    job = active_jobs[job_id]
-    if job["status"] != "FINALIZADO" and job["status"] != "ERRO":
-         return {"status": job["status"], "message": "Processamento ainda em andamento"}
-    return {"status": job["status"], "resultados": job.get("resultados", [])}
-
+    try:
+        # Passa os itens para a camada de serviço que lida com o semáforo de concorrência
+        resultados = await processar_lote_stateless_async(request.itens)
+        return {"status": "SUCESSO", "resultados": resultados}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/orcamento/gerar-composicao-ia")
 async def gerar_composicao(request: ComposicaoRequest):
