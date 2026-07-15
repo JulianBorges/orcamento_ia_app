@@ -64,6 +64,17 @@ async def processar_real_ai(item: StatelessBatchItem):
         # Limpa o código nos metadados para garantir que o front renderize apenas o número
         if 'codigo' in meta and isinstance(meta['codigo'], str):
             meta['codigo'] = meta['codigo'].replace('comp_', '')
+            
+        top_3_matches = []
+        for m in matches[:3]:
+            m_meta = m.get('metadata', {})
+            top_3_matches.append({
+                "codigo": str(m_meta.get("codigo", "")).replace('comp_', ''),
+                "descricao": m_meta.get("descricao", ""),
+                "unidade": m_meta.get("unidade", ""),
+                "custo": m_meta.get("custo", m_meta.get("preco", 0.0)),
+                "score": round(m.get('score', 0) * 100)
+            })
         
         return {
             "id": item.id,
@@ -71,6 +82,7 @@ async def processar_real_ai(item: StatelessBatchItem):
             "quantidade_original": quantidade,
             "analise": analise.dict(),
             "metadados": meta,
+            "top_3_matches": top_3_matches,
             "status": "SUCESSO"
         }
     except Exception as e:

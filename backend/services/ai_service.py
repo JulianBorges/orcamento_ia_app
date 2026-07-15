@@ -34,7 +34,7 @@ NUNCA selecione usos de nicho (ex: dreno de ar-condicionado) se o legado for gen
 
 REGRA 4: ESTRUTURA E CLASSIFICAÇÃO DA RESPOSTA (OBRIGATÓRIO JSON)
 - Se houver correspondência exata ou equivalência plena: status = "ACEITO" e justifique.
-- Se houver diferença aceitável (tolerância de 20%) ou se você assumiu o uso mais comum para um legado genérico (Regra 3): status = "ACEITO COM PREMISSA" e justifique a escolha do uso padrão.
+- Se houver diferença aceitável (tolerância de 20%) ou se você assumiu o uso mais comum para um legado genérico (Regra 3): status = "ACEITO COM RESSALVA" e justifique a escolha do uso padrão.
 - Se quebrar as regras de Escopo Macro vs Micro (Regra 1) ou de Dimensão física >20% (Regra 2): status = "REJEITADO" e explique a violação.
 Sua resposta final deve ser estritamente no formato JSON estruturado solicitado.
 """

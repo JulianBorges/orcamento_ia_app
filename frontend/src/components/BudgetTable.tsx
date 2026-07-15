@@ -10,7 +10,7 @@ import {
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { 
-    Plus, Trash2, Wand2, Box, Layers, Loader2, ArrowUpDown
+    Plus, Trash2, Wand2, Box, Layers, Loader2, ArrowUpDown, Brain, X
 } from "lucide-react";
 
 export type BudgetItem = {
@@ -25,6 +25,7 @@ export type BudgetItem = {
   total: number;
   ai_status?: string;
   ai_justificativa?: string;
+  top_3_matches?: any[];
 };
 
 const columnHelper = createColumnHelper<BudgetItem>();
@@ -181,6 +182,7 @@ export function BudgetTable({
     bdi?: number 
 }) {
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [memoryModalData, setMemoryModalData] = useState<any[] | null>(null);
 
   const updateData = React.useCallback((rowIndex: number, columnId: string, value: any) => {
       setData(old =>
@@ -236,13 +238,31 @@ export function BudgetTable({
         cell: info => <CellInput initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'base', v)} className="w-full bg-transparent text-zinc-300 outline-none focus:bg-zinc-800 px-1 rounded" />
     }),
     columnHelper.accessor("descricao", { 
-        header: "Descrição do Serviço/Insumo",
+        header: "Descrição do Serviço",
         size: 600,
-        cell: info => <AutocompleteDescricaoCell 
-            initialValue={info.getValue()} 
-            rowIndex={info.row.index}
-            onUpdateRow={(newRowData: any) => updateRow(info.row.index, newRowData)}
-        />
+        cell: info => {
+            const hasMemory = info.row.original.top_3_matches && info.row.original.top_3_matches.length > 0;
+            return (
+                <div className="flex items-center gap-2 w-full h-full group/desc">
+                    <div className="flex-1">
+                        <AutocompleteDescricaoCell 
+                            initialValue={info.getValue()} 
+                            rowIndex={info.row.index}
+                            onUpdateRow={(newRowData: any) => updateRow(info.row.index, newRowData)}
+                        />
+                    </div>
+                    {hasMemory && (
+                        <button 
+                            onClick={() => setMemoryModalData(info.row.original.top_3_matches!)}
+                            className="p-1.5 rounded-md text-indigo-400/50 hover:text-indigo-300 hover:bg-indigo-500/10 transition-colors opacity-0 group-hover/desc:opacity-100 flex-shrink-0"
+                            title="Ver Memória de Cálculo da IA"
+                        >
+                            <Brain className="w-4 h-4" />
+                        </button>
+                    )}
+                </div>
+            );
+        }
     }),
     columnHelper.accessor("ai_status", {
         header: "Parecer IA",
@@ -252,13 +272,34 @@ export function BudgetTable({
             const just = info.row.original.ai_justificativa || '';
             
             let color = "bg-zinc-800 text-zinc-400";
-            if (status.includes("APROVADO")) color = "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
-            else if (status.includes("REVISAO")) color = "bg-amber-500/10 text-amber-400 border border-amber-500/20";
-            else if (status.includes("REJEITADO") || status.includes("ERRO") || status.includes("VAZIO")) color = "bg-red-500/10 text-red-400 border border-red-500/20";
+            let label = status.replace(/_/g, ' ');
+            
+            if (status.includes("ACEITO COM") || status.includes("RESSALVA") || status.includes("PREMISSA")) {
+                color = "bg-amber-500/10 text-amber-400 border border-amber-500/20";
+                label = "ACEITO*";
+            } else if (status === "ACEITO" || status.includes("APROVADO")) {
+                color = "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+                label = "ACEITO";
+            } else if (status.includes("REJEITADO") || status.includes("ERRO") || status.includes("VAZIO")) {
+                color = "bg-red-500/10 text-red-400 border border-red-500/20";
+            } else if (status === "PROCESSANDO") {
+                color = "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 animate-pulse";
+            }
             
             return (
-                <div className={`px-2 py-0.5 rounded-full text-[10px] font-semibold w-max ${color} cursor-help truncate max-w-full`} title={just}>
-                    {status.replace(/_/g, ' ')}
+                <div className="relative group/tooltip flex items-center h-full">
+                    <div className={`px-2 py-0.5 rounded-full text-[10px] font-semibold w-max ${color} cursor-help truncate max-w-full`}>
+                        {label}
+                    </div>
+                    {/* Custom Instant Tooltip */}
+                    {just && (
+                        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 p-3 bg-[#18181b] border border-zinc-700 rounded-lg shadow-2xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-100 z-[9999] text-xs text-zinc-300 font-normal whitespace-normal leading-relaxed pointer-events-none">
+                            <div className="font-semibold text-zinc-100 mb-1">{label}</div>
+                            {just}
+                            {/* Seta do tooltip */}
+                            <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#18181b] border-b border-r border-zinc-700 rotate-45"></div>
+                        </div>
+                    )}
                 </div>
             );
         }
@@ -458,6 +499,60 @@ export function BudgetTable({
             </div>
           </div>
         </div>
+
+        {/* Modal de Memória de Cálculo (Explainability) */}
+        {memoryModalData && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                <div className="bg-[#18181b] border border-zinc-700 rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+                    <div className="flex items-center justify-between p-4 border-b border-zinc-800">
+                        <div className="flex items-center gap-2 text-indigo-400">
+                            <Brain className="w-5 h-5" />
+                            <h2 className="text-lg font-semibold text-zinc-100">Memória de Cálculo da IA</h2>
+                        </div>
+                        <button 
+                            onClick={() => setMemoryModalData(null)}
+                            className="p-1.5 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100 transition-colors"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                    
+                    <div className="p-4 overflow-y-auto custom-scrollbar flex flex-col gap-3">
+                        <p className="text-sm text-zinc-400 mb-2">
+                            A Inteligência Artificial analisou o banco de dados do SINAPI e selecionou as 3 opções matemáticas e semânticas mais prováveis antes de tomar o veredito final:
+                        </p>
+                        
+                        {memoryModalData.map((match: any, idx: number) => (
+                            <div key={idx} className="bg-[#09090b] border border-zinc-800 rounded-lg p-3 flex flex-col gap-2 relative overflow-hidden">
+                                {idx === 0 && (
+                                    <div className="absolute top-0 right-0 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-bl-lg border-l border-b border-emerald-500/20">
+                                        Vencedor
+                                    </div>
+                                )}
+                                <div className="flex items-center gap-2 flex-wrap pr-16">
+                                    <span className="text-xs font-mono text-blue-400 bg-blue-400/10 px-1.5 py-0.5 rounded border border-blue-400/20">{match.codigo}</span>
+                                    <span className="text-xs font-medium text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded border border-emerald-400/20">R$ {Number(match.custo).toFixed(2)}</span>
+                                    <span className="text-xs font-medium text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded border border-amber-400/20">{match.unidade}</span>
+                                    <span className="text-xs font-medium text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20">Match: {match.score}%</span>
+                                </div>
+                                <p className="text-sm text-zinc-300 leading-relaxed">
+                                    {match.descricao}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                    
+                    <div className="p-4 border-t border-zinc-800 flex justify-end">
+                        <button 
+                            onClick={() => setMemoryModalData(null)}
+                            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-sm font-medium text-zinc-100 rounded-md transition-colors"
+                        >
+                            Fechar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
     </div>
   );
 }

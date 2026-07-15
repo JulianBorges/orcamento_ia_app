@@ -171,7 +171,8 @@ export default function Home() {
                                 valorUnit: isApproved ? (meta.custo || 0.0) : 0.0,
                                 total: (isApproved ? (meta.custo || 0.0) : 0.0) * oldItem.quant,
                                 ai_status: aiStatus,
-                                ai_justificativa: analise.justificativa || resData.justificativa || aiError || 'Falha ao processar'
+                                ai_justificativa: analise.justificativa || resData.justificativa || aiError || 'Falha ao processar',
+                                top_3_matches: resData.top_3_matches || []
                             };
                         });
                         setTableData([...currentTableData]);

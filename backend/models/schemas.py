@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 
 class AnaliseItem(BaseModel):
-    status: str = Field(description="O veredito da análise: 'ACEITO', 'ACEITO COM PREMISSA' ou 'REJEITADO'")
+    status: str = Field(description="O veredito da análise: 'ACEITO', 'ACEITO COM RESSALVA' ou 'REJEITADO'")
     codigo_selecionado: Optional[str] = Field(None, description="O código SINAPI da opção selecionada. Null se REJEITADO.")
     justificativa: str = Field(description="A justificativa técnica de engenharia para a decisão, incluindo os cálculos de diferença quando aplicável.")
 
