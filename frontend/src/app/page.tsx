@@ -15,6 +15,20 @@ export default function Home() {
   const [tableData, setTableData] = useState<BudgetItem[]>([]);
   const [bdi, setBdi] = useState(25.0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const pendingVisualUpdates = useRef<any[]>([]);
+
+  // Efeito Dominó (Fila Global)
+  useEffect(() => {
+      const interval = setInterval(() => {
+          if (pendingVisualUpdates.current.length > 0) {
+              const nextUpdate = pendingVisualUpdates.current.shift();
+              setTableData(prev => prev.map(oldItem => 
+                  oldItem.id === nextUpdate.id ? nextUpdate : oldItem
+              ));
+          }
+      }, 650);
+      return () => clearInterval(interval);
+  }, []);
 
   // Carregar do LocalStorage no Mount
   useEffect(() => {
@@ -112,9 +126,12 @@ export default function Home() {
              quant: r.quantidade,
              valorUnit: 0.0,
              total: 0.0,
-             ai_status: 'PENDENTE',
-             ai_justificativa: 'Aguardando processamento...'
+             ai_status: 'PROCESSANDO',
+             ai_justificativa: 'Analisando via IA...'
         }));
+        
+        // Limpa a fila do efeito dominó caso inicie novo lote
+        pendingVisualUpdates.current = [];
         
         // Atualiza o estado da tabela sincronicamente antes de iniciar o loop assíncrono
         let currentTableData = append ? [...tableData, ...initialItems] : initialItems;
@@ -129,15 +146,6 @@ export default function Home() {
             let retries = 3;
             let success = false;
             
-            // Marca o lote atual como "PROCESSANDO" visualmente
-            currentTableData = currentTableData.map(oldItem => {
-                if (chunk.some(c => c.id === oldItem.id)) {
-                    return { ...oldItem, ai_status: 'PROCESSANDO', ai_justificativa: 'Analisando via IA...' };
-                }
-                return oldItem;
-            });
-            setTableData([...currentTableData]);
-
             while (retries > 0 && !success) {
                 try {
                     const res = await fetch(`/api/orcamento/processar-lote-stateless`, {
@@ -151,6 +159,8 @@ export default function Home() {
                     const responseData = await res.json();
                     
                     if (responseData.resultados) {
+                        const updatedItemsMap = new Map();
+                        
                         currentTableData = currentTableData.map(oldItem => {
                             const resultRow = responseData.resultados.find((r: any) => r.id === oldItem.id);
                             if (!resultRow) return oldItem;
@@ -162,7 +172,7 @@ export default function Home() {
                             const aiError = analise.erro || resData.erro || resultRow.erro;
                             const aiStatus = analise.status || resultRow.status || 'ERRO';
                             
-                            return {
+                            const newItem = {
                                 ...oldItem,
                                 codigo: isApproved ? (meta.codigo || '-') : '-',
                                 base: isApproved ? "SINAPI" : "-",
@@ -174,8 +184,13 @@ export default function Home() {
                                 ai_justificativa: analise.justificativa || resData.justificativa || aiError || 'Falha ao processar',
                                 top_3_matches: resData.top_3_matches || []
                             };
+                            
+                            updatedItemsMap.set(newItem.id, newItem);
+                            return newItem;
                         });
-                        setTableData([...currentTableData]);
+                        
+                        // Joga na fila global para o Efeito Domino (3s por item)
+                        pendingVisualUpdates.current.push(...Array.from(updatedItemsMap.values()));
                     }
                     success = true;
                 } catch (err) {
@@ -218,6 +233,7 @@ export default function Home() {
           setTableData([]);
           setTitle("Orçamento Base");
           setBdi(25.0);
+          pendingVisualUpdates.current = [];
           if (fileInputRef.current) fileInputRef.current.value = "";
       }
   };
