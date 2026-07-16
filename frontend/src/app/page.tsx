@@ -1,13 +1,15 @@
 "use client";
 import { useState, useRef, useMemo, useEffect } from "react";
-import { UploadCloud, Loader2, Settings, Plus, Download, Trash2, AlertCircle } from "lucide-react";
+import { UploadCloud, Loader2, Settings, Plus, Download, Trash2, AlertCircle, Sparkles } from "lucide-react";
 import { BudgetTable, BudgetItem } from "@/components/BudgetTable";
+import { CompositionCreatorModal, ComposicaoGerada } from "@/components/CompositionCreatorModal";
 import * as XLSX from "xlsx";
 
 export default function Home() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [title, setTitle] = useState("Orçamento Base");
   const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [showCreatorModal, setShowCreatorModal] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -277,6 +279,23 @@ export default function Home() {
       XLSX.writeFile(workbook, `${title.replace(/\s+/g, '_')}_${new Date().getTime()}.xlsx`);
   };
 
+  const handleAddCustomComposition = (composicao: ComposicaoGerada, originalQuery: string) => {
+      const newItem: BudgetItem = {
+          id: `r_${Date.now()}_custom`,
+          item: `1.${tableData.length + 1}`,
+          codigo: 'IA CUSTOM',
+          base: 'IA CUSTOM',
+          descricao: composicao.servico,
+          und: composicao.unidade_medida,
+          quant: 1.0,
+          valorUnit: composicao.valor_total_composicao,
+          total: composicao.valor_total_composicao,
+          ai_status: 'ACEITO',
+          ai_justificativa: `Composição Inédita Gerada por IA baseada na requisição: "${originalQuery}".\n\nAuditoria: ${composicao.justificativa}`
+      };
+      setTableData([...tableData, newItem]);
+  };
+
   return (
     <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans selection:bg-indigo-500/30">
       {/* Header Minimalista */}
@@ -285,9 +304,17 @@ export default function Home() {
           <div className="flex items-center gap-2">
             <span className="font-semibold tracking-tight text-zinc-100">Copiloto <span className="text-zinc-500 font-light">Orçamento</span></span>
           </div>
-          <button className="p-2 rounded-md hover:bg-zinc-800 text-zinc-400 transition-colors">
-            <Settings className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-4">
+              <button 
+                  onClick={() => setShowCreatorModal(true)}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 text-sm font-medium rounded-md transition-colors border border-indigo-500/20"
+              >
+                  <Sparkles className="w-4 h-4" /> Criar Composição (IA)
+              </button>
+              <button className="p-2 rounded-md hover:bg-zinc-800 text-zinc-400 transition-colors">
+                <Settings className="w-4 h-4" />
+              </button>
+          </div>
         </div>
       </header>
 
@@ -424,6 +451,12 @@ export default function Home() {
                 </div>
             </div>
         )}
+
+        <CompositionCreatorModal 
+            isOpen={showCreatorModal}
+            onClose={() => setShowCreatorModal(false)}
+            onAddComposition={handleAddCustomComposition}
+        />
       </main>
     </div>
   );
