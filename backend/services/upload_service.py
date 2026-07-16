@@ -55,7 +55,7 @@ async def processar_real_ai(item: StatelessBatchItem):
         if not matches or matches[0]['score'] < 0.3:
             return {"id": item.id, "status": "REJEITADO_FILTRO_MATEMATICO", "justificativa": "Sem similaridade na base.", "quantidade_original": quantidade, "descricao_original": descricao}
             
-        analise = await fluxo_multi_agentes_mapeamento_async(descricao, matches)
+        analise = await fluxo_multi_agentes_mapeamento_async(item, matches)
         
         # Recuperar metadados do item selecionado para exibir no front (ignorando o prefixo comp_ se houver)
         codigo_selecionado = str(analise.codigo_selecionado).replace('comp_', '')

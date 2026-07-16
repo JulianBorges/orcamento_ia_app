@@ -92,14 +92,22 @@ export default function Home() {
         const rows = jsonData.map((row: any, index: number) => {
             let descricao = "";
             let quantidade = 1.0;
+            let unidade = "";
+            let valorUnit = 0.0;
             
             for (const key of Object.keys(row)) {
                 const lowerKey = String(key).toLowerCase();
                 if (['descricao', 'descrição', 'servico', 'serviço', 'nome'].includes(lowerKey)) {
                     descricao = row[key];
                 }
-                if (['quant', 'quantidade', 'qtd', 'qnt'].includes(lowerKey)) {
+                else if (['quant', 'quantidade', 'qtd', 'qnt'].includes(lowerKey)) {
                     quantidade = parseFloat(row[key]) || 1.0;
+                }
+                else if (['und', 'un', 'unidade', 'medida'].includes(lowerKey)) {
+                    unidade = String(row[key]);
+                }
+                else if (['valor', 'preco', 'preço', 'unitario', 'unitário', 'custo'].includes(lowerKey)) {
+                    valorUnit = parseFloat(String(row[key]).replace(',', '.')) || 0.0;
                 }
             }
             if (!descricao) {
@@ -110,7 +118,9 @@ export default function Home() {
             return {
                 id: `r_${Date.now()}_${index}`,
                 descricao: String(descricao),
-                quantidade
+                quantidade,
+                unidade,
+                valorUnit
             };
         });
 
@@ -122,10 +132,10 @@ export default function Home() {
              codigo: '-',
              base: '-',
              descricao: r.descricao,
-             und: '-',
+             und: r.unidade || '-',
              quant: r.quantidade,
-             valorUnit: 0.0,
-             total: 0.0,
+             valorUnit: r.valorUnit || 0.0,
+             total: (r.valorUnit || 0.0) * r.quantidade,
              ai_status: 'PROCESSANDO',
              ai_justificativa: 'Analisando via IA...'
         }));
@@ -142,7 +152,13 @@ export default function Home() {
         let completed = 0;
         
         for (let i = 0; i < rows.length; i += chunkSize) {
-            const chunk = rows.slice(i, i + chunkSize);
+            const chunk = rows.slice(i, i + chunkSize).map(item => ({
+                id: item.id,
+                descricao: item.descricao,
+                quantidade: item.quantidade,
+                unidade: item.unidade,
+                valorUnit: item.valorUnit
+            }));
             let retries = 3;
             let success = false;
             
