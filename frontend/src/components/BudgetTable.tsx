@@ -90,7 +90,7 @@ const CodigoCell = ({ initialValue, onUpdate }: any) => {
                 if (!initialValue || initialValue === '-') return;
                 alert("Abertura detalhada da composição " + initialValue + " (SINAPI ou Própria) em desenvolvimento!");
             }}
-            className="w-full bg-transparent text-blue-400 px-1 rounded cursor-pointer hover:bg-zinc-100 dark:bg-zinc-800/50 hover:underline decoration-blue-500/50 underline-offset-4 truncate text-center"
+            className="w-full bg-transparent text-blue-400 px-1 rounded cursor-pointer hover:underline decoration-blue-500/50 underline-offset-4 truncate text-center"
             title="Clique para abrir, duplo clique para editar"
         >
             {initialValue || '-'}
@@ -197,7 +197,7 @@ const AutocompleteDescricaoCell = ({ initialValue, rowIndex, onUpdateRow }: any)
                             textareaRef.current?.blur();
                         }
                     }}
-                    className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 outline-none focus:bg-zinc-100 dark:bg-zinc-800 px-1 py-1 rounded resize-none cursor-text block leading-snug overflow-hidden"
+                    className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 outline-none px-1 py-1 rounded resize-none cursor-text block leading-snug overflow-hidden"
                     rows={1}
                     style={{ minHeight: '32px' }}
                 />
@@ -300,7 +300,7 @@ export function BudgetTable({
     columnHelper.accessor("item", { 
         header: "Item", 
         size: 70,
-        cell: info => <CellInput initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'item', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 font-semibold outline-none focus:bg-zinc-100 dark:bg-zinc-800 px-1 rounded text-center" />
+        cell: info => <CellInput initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'item', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 font-semibold outline-none px-1 rounded text-center" />
     }),
     columnHelper.accessor("codigo", { 
         header: "Código", 
@@ -310,7 +310,7 @@ export function BudgetTable({
     columnHelper.accessor("base", { 
         header: "Base", 
         size: 80,
-        cell: info => <CellInput initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'base', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 outline-none focus:bg-zinc-100 dark:bg-zinc-800 px-1 rounded text-center" />
+        cell: info => <CellInput initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'base', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 outline-none px-1 rounded text-center" />
     }),
     columnHelper.accessor("descricao", { 
         header: "Descrição do Serviço",
@@ -382,17 +382,17 @@ export function BudgetTable({
     columnHelper.accessor("und", { 
         header: "Und", 
         size: 60,
-        cell: info => <CellInput initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'und', v)} className="w-full bg-transparent text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 outline-none focus:bg-zinc-100 dark:bg-zinc-800 px-1 rounded text-center" />
+        cell: info => <CellInput initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'und', v)} className="w-full bg-transparent text-zinc-400 dark:text-zinc-500 outline-none px-1 rounded text-center" />
     }),
     columnHelper.accessor("quant", { 
         header: "Quant.", 
         size: 90,
-        cell: info => <CellInput type="number" step="0.01" initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'quant', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 outline-none focus:bg-zinc-100 dark:bg-zinc-800 px-1 rounded text-center" />
+        cell: info => <CellInput type="number" step="0.01" initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'quant', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 outline-none px-1 rounded text-center" />
     }),
     columnHelper.accessor("valorUnit", { 
         header: "Valor Unit", 
         size: 110,
-        cell: info => <CellInput type="number" step="0.01" initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'valorUnit', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 outline-none focus:bg-zinc-100 dark:bg-zinc-800 px-1 rounded text-center" />
+        cell: info => <CellInput type="number" step="0.01" initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'valorUnit', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 outline-none px-1 rounded text-center" />
     }),
     columnHelper.display({
         id: "valorUnitBdi",
@@ -495,7 +495,7 @@ export function BudgetTable({
             
             {/* Body */}
             <div 
-                className="relative w-full flex flex-col divide-y divide-zinc-800/50"
+                className="relative w-full flex flex-col divide-y divide-zinc-200 dark:divide-zinc-800/50"
                 style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
             >
               {rowVirtualizer.getVirtualItems().map((virtualRow) => {

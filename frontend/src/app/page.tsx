@@ -339,10 +339,10 @@ export default function Home() {
           
           <div className="flex items-center gap-6">
               {tableData.length > 0 && (
-                  <div className="flex items-center gap-6 mr-4 bg-white dark:bg-zinc-900/50 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800/50 shadow-inner">
+                  <div className="flex items-center gap-6 mr-4 bg-white dark:bg-zinc-800 p-3 rounded-lg border border-zinc-200 dark:border-zinc-700 shadow-sm">
                       <div className="flex flex-col">
-                          <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400 dark:text-zinc-500 mb-0.5">BDI (%)</span>
-                          <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 rounded px-2 py-1 focus-within:ring-2 focus-within:ring-indigo-500/50">
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400 dark:text-zinc-400 mb-0.5">BDI (%)</span>
+                          <div className="flex items-center gap-1 bg-zinc-50 dark:bg-zinc-900 rounded px-2 py-1 focus-within:ring-2 focus-within:ring-indigo-500/50">
                               <input 
                                   type="number" 
                                   value={bdi} 
