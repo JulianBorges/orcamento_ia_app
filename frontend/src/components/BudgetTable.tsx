@@ -58,11 +58,21 @@ const AutocompleteDescricaoCell = ({ initialValue, rowIndex, onUpdateRow }: any)
     const [isOpen, setIsOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const wrapperRef = useRef<HTMLDivElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
     const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
+    // Sincroniza valor inicial e ajusta altura
     useEffect(() => {
         setVal(initialValue);
     }, [initialValue]);
+
+    // Ajusta a altura sempre que o valor mudar
+    useEffect(() => {
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+        }
+    }, [val]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -125,6 +135,7 @@ const AutocompleteDescricaoCell = ({ initialValue, rowIndex, onUpdateRow }: any)
         <div ref={wrapperRef} className="relative w-full h-full flex items-center">
             <div className="relative w-full">
                 <textarea 
+                    ref={textareaRef}
                     value={val}
                     onChange={onChange}
                     onKeyDown={(e) => {
@@ -134,9 +145,9 @@ const AutocompleteDescricaoCell = ({ initialValue, rowIndex, onUpdateRow }: any)
                             setIsOpen(false);
                         }
                     }}
-                    className="w-full bg-transparent text-zinc-300 outline-none focus:bg-zinc-800 px-1 py-1 rounded resize-none custom-scrollbar cursor-text block leading-tight"
+                    className="w-full bg-transparent text-zinc-300 outline-none focus:bg-zinc-800 px-1 py-1 rounded resize-none cursor-text block leading-snug overflow-hidden"
                     rows={1}
-                    style={{ minHeight: '24px', overflow: 'hidden' }}
+                    style={{ minHeight: '32px' }}
                 />
                 {isLoading && <Loader2 className="absolute right-2 top-2 w-3 h-3 text-indigo-400 animate-spin" />}
             </div>
@@ -441,9 +452,9 @@ export function BudgetTable({
                         key={row.id} 
                         ref={rowVirtualizer.measureElement}
                         data-index={virtualRow.index}
-                        className="group hover:bg-zinc-800/30 transition-colors duration-150 absolute top-0 left-0 w-full flex items-center py-1 z-10 hover:z-[90]"
+                        className="group hover:bg-zinc-800/30 transition-colors duration-150 absolute top-0 left-0 w-full flex items-center py-2 z-10 hover:z-[90]"
                         style={{
-                            minHeight: '44px',
+                            minHeight: '52px',
                             transform: `translateY(${virtualRow.start}px)`,
                         }}
                     >
