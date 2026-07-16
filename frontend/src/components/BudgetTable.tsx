@@ -78,7 +78,7 @@ const CodigoCell = ({ initialValue, onUpdate }: any) => {
                         e.currentTarget.blur();
                     }
                 }}
-                className="w-full bg-zinc-800 text-blue-400 outline-none px-1 rounded cursor-text"
+                className="w-full bg-zinc-100 dark:bg-zinc-800 text-blue-400 outline-none px-1 rounded cursor-text"
             />
         );
     }
@@ -90,7 +90,7 @@ const CodigoCell = ({ initialValue, onUpdate }: any) => {
                 if (!initialValue || initialValue === '-') return;
                 alert("Abertura detalhada da composição " + initialValue + " (SINAPI ou Própria) em desenvolvimento!");
             }}
-            className="w-full bg-transparent text-blue-400 px-1 rounded cursor-pointer hover:bg-zinc-800/50 hover:underline decoration-blue-500/50 underline-offset-4 truncate"
+            className="w-full bg-transparent text-blue-400 px-1 rounded cursor-pointer hover:bg-zinc-100 dark:bg-zinc-800/50 hover:underline decoration-blue-500/50 underline-offset-4 truncate"
             title="Clique para abrir, duplo clique para editar"
         >
             {initialValue || '-'}
@@ -197,7 +197,7 @@ const AutocompleteDescricaoCell = ({ initialValue, rowIndex, onUpdateRow }: any)
                             textareaRef.current?.blur();
                         }
                     }}
-                    className="w-full bg-transparent text-zinc-300 outline-none focus:bg-zinc-800 px-1 py-1 rounded resize-none cursor-text block leading-snug overflow-hidden"
+                    className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 outline-none focus:bg-zinc-100 dark:bg-zinc-800 px-1 py-1 rounded resize-none cursor-text block leading-snug overflow-hidden"
                     rows={1}
                     style={{ minHeight: '32px' }}
                 />
@@ -205,17 +205,17 @@ const AutocompleteDescricaoCell = ({ initialValue, rowIndex, onUpdateRow }: any)
             </div>
             
             {isOpen && results.length > 0 && (
-                <div className="absolute left-0 top-full mt-1 w-[600px] z-[999] bg-[#18181b] border border-zinc-700 rounded-lg shadow-2xl overflow-hidden flex flex-col transform origin-top-left transition-all">
-                    <div className="bg-zinc-800/50 px-3 py-1.5 border-b border-zinc-700 flex justify-between items-center">
-                        <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400 flex items-center gap-1"><Wand2 className="w-3 h-3"/> Sugestões da Inteligência</span>
-                        <span className="text-[10px] text-zinc-500">{results.length} resultados no SINAPI</span>
+                <div className="absolute left-0 top-full mt-1 w-[600px] z-[999] bg-white dark:bg-[#18181b] border border-zinc-300 dark:border-zinc-700 rounded-lg shadow-2xl overflow-hidden flex flex-col transform origin-top-left transition-all">
+                    <div className="bg-zinc-100 dark:bg-zinc-800/50 px-3 py-1.5 border-b border-zinc-300 dark:border-zinc-700 flex justify-between items-center">
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 flex items-center gap-1"><Wand2 className="w-3 h-3"/> Sugestões da Inteligência</span>
+                        <span className="text-[10px] text-zinc-400 dark:text-zinc-500">{results.length} resultados no SINAPI</span>
                     </div>
                     <div className="max-h-[300px] overflow-y-auto custom-scrollbar flex flex-col">
                         {results.map((r, i) => (
                             <div 
                                 key={i}
                                 onClick={() => onSelect(r)}
-                                className="flex flex-col p-3 hover:bg-zinc-800/80 border-b border-zinc-800/50 cursor-pointer transition-colors group"
+                                className="flex flex-col p-3 hover:bg-zinc-100 dark:bg-zinc-800/80 border-b border-zinc-200 dark:border-zinc-800/50 cursor-pointer transition-colors group"
                             >
                                 <div className="flex items-center justify-between mb-1">
                                     <div className="flex items-center gap-2">
@@ -223,9 +223,9 @@ const AutocompleteDescricaoCell = ({ initialValue, rowIndex, onUpdateRow }: any)
                                         <span className="text-xs font-medium text-emerald-400 bg-emerald-400/10 px-1.5 py-0.5 rounded">R$ {Number(r.preco).toFixed(2)}</span>
                                         <span className="text-xs font-medium text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded shadow-sm">{r.unidade}</span>
                                     </div>
-                                    <span className="text-[10px] text-zinc-500 group-hover:text-indigo-400 transition-colors">Match: {Math.round(Number(r.score) * 100)}%</span>
+                                    <span className="text-[10px] text-zinc-400 dark:text-zinc-500 group-hover:text-indigo-400 transition-colors">Match: {Math.round(Number(r.score) * 100)}%</span>
                                 </div>
-                                <span className="text-sm text-zinc-300 line-clamp-2 leading-relaxed">{r.descricao}</span>
+                                <span className="text-sm text-zinc-700 dark:text-zinc-300 line-clamp-2 leading-relaxed">{r.descricao}</span>
                             </div>
                         ))}
                     </div>
@@ -300,7 +300,7 @@ export function BudgetTable({
     columnHelper.accessor("item", { 
         header: "Item", 
         size: 70,
-        cell: info => <CellInput initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'item', v)} className="w-full bg-transparent text-zinc-300 font-semibold outline-none focus:bg-zinc-800 px-1 rounded" />
+        cell: info => <CellInput initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'item', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 font-semibold outline-none focus:bg-zinc-100 dark:bg-zinc-800 px-1 rounded" />
     }),
     columnHelper.accessor("codigo", { 
         header: "Código", 
@@ -310,7 +310,7 @@ export function BudgetTable({
     columnHelper.accessor("base", { 
         header: "Base", 
         size: 80,
-        cell: info => <CellInput initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'base', v)} className="w-full bg-transparent text-zinc-300 outline-none focus:bg-zinc-800 px-1 rounded" />
+        cell: info => <CellInput initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'base', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 outline-none focus:bg-zinc-100 dark:bg-zinc-800 px-1 rounded" />
     }),
     columnHelper.accessor("descricao", { 
         header: "Descrição do Serviço",
@@ -346,7 +346,7 @@ export function BudgetTable({
             const status = info.getValue() || 'PENDENTE';
             const just = info.row.original.ai_justificativa || '';
             
-            let color = "bg-zinc-800 text-zinc-400";
+            let color = "bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 dark:text-zinc-400";
             let label = status.replace(/_/g, ' ');
             
             if (status.includes("ACEITO COM") || status.includes("RESSALVA") || status.includes("PREMISSA")) {
@@ -368,11 +368,11 @@ export function BudgetTable({
                     </div>
                     {/* Custom Instant Tooltip (ao lado, mais fino e alinhado no topo) */}
                     {just && (
-                        <div className="absolute left-full ml-3 top-0 w-80 p-3 bg-[#18181b] border border-zinc-700 rounded-lg shadow-2xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-100 z-[9999] text-xs text-zinc-300 font-normal whitespace-normal leading-relaxed pointer-events-none">
-                            <div className="font-semibold text-zinc-100 mb-1">{label}</div>
+                        <div className="absolute left-full ml-3 top-0 w-80 p-3 bg-white dark:bg-[#18181b] border border-zinc-300 dark:border-zinc-700 rounded-lg shadow-2xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-100 z-[9999] text-xs text-zinc-700 dark:text-zinc-300 font-normal whitespace-normal leading-relaxed pointer-events-none">
+                            <div className="font-semibold text-zinc-900 dark:text-zinc-100 mb-1">{label}</div>
                             {just}
                             {/* Seta do tooltip ajustada para o topo */}
-                            <div className="absolute top-2 -left-1.5 w-3 h-3 bg-[#18181b] border-l border-t border-zinc-700 -rotate-45"></div>
+                            <div className="absolute top-2 -left-1.5 w-3 h-3 bg-white dark:bg-[#18181b] border-l border-t border-zinc-300 dark:border-zinc-700 -rotate-45"></div>
                         </div>
                     )}
                 </div>
@@ -382,17 +382,17 @@ export function BudgetTable({
     columnHelper.accessor("und", { 
         header: "Und", 
         size: 60,
-        cell: info => <CellInput initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'und', v)} className="w-full bg-transparent text-zinc-400 outline-none focus:bg-zinc-800 px-1 rounded text-center" />
+        cell: info => <CellInput initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'und', v)} className="w-full bg-transparent text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 outline-none focus:bg-zinc-100 dark:bg-zinc-800 px-1 rounded text-center" />
     }),
     columnHelper.accessor("quant", { 
         header: "Quant.", 
         size: 90,
-        cell: info => <CellInput type="number" step="0.01" initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'quant', v)} className="w-full bg-transparent text-zinc-300 outline-none focus:bg-zinc-800 px-1 rounded text-right" />
+        cell: info => <CellInput type="number" step="0.01" initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'quant', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 outline-none focus:bg-zinc-100 dark:bg-zinc-800 px-1 rounded text-right" />
     }),
     columnHelper.accessor("valorUnit", { 
         header: "Valor Unit", 
         size: 110,
-        cell: info => <CellInput type="number" step="0.01" initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'valorUnit', v)} className="w-full bg-transparent text-zinc-300 outline-none focus:bg-zinc-800 px-1 rounded text-right" />
+        cell: info => <CellInput type="number" step="0.01" initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'valorUnit', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 outline-none focus:bg-zinc-100 dark:bg-zinc-800 px-1 rounded text-right" />
     }),
     columnHelper.display({
         id: "valorUnitBdi",
@@ -400,7 +400,7 @@ export function BudgetTable({
         size: 110,
         cell: info => {
             const val = info.row.original.valorUnit * (1 + bdi / 100);
-            return <div className="text-right px-1 text-zinc-300 w-full">{val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>;
+            return <div className="text-right px-1 text-zinc-700 dark:text-zinc-300 w-full">{val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>;
         }
     }),
     columnHelper.display({
@@ -409,7 +409,7 @@ export function BudgetTable({
         size: 130,
         cell: info => {
             const val = (info.row.original.valorUnit * (1 + bdi / 100)) * info.row.original.quant;
-            return <div className="text-right px-1 font-semibold text-zinc-200 w-full">{val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>;
+            return <div className="text-right px-1 font-semibold text-zinc-800 dark:text-zinc-200 w-full">{val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>;
         }
     })
   ], [bdi, updateData]);
@@ -440,35 +440,35 @@ export function BudgetTable({
 
   if (data.length === 0) {
       return (
-          <div className="w-full flex flex-col items-center justify-center py-20 bg-[#09090b] rounded-lg border border-zinc-800 border-dashed">
+          <div className="w-full flex flex-col items-center justify-center py-20 bg-zinc-50 dark:bg-[#09090b] rounded-lg border border-zinc-200 dark:border-zinc-800 border-dashed">
               <Layers className="w-12 h-12 text-zinc-700 mb-4" />
-              <h3 className="text-lg font-medium text-zinc-300">Nenhum orçamento carregado</h3>
-              <p className="text-zinc-500 text-sm mt-1 max-w-sm text-center">Faça o upload da sua planilha Excel para a Inteligência Artificial analisar.</p>
+              <h3 className="text-lg font-medium text-zinc-700 dark:text-zinc-300">Nenhum orçamento carregado</h3>
+              <p className="text-zinc-400 dark:text-zinc-500 text-sm mt-1 max-w-sm text-center">Faça o upload da sua planilha Excel para a Inteligência Artificial analisar.</p>
           </div>
       );
   }
 
   return (
     <div className="flex flex-col gap-4 w-full h-full">
-        <div className="flex items-center justify-between text-sm text-zinc-400">
+        <div className="flex items-center justify-between text-sm text-zinc-400 dark:text-zinc-500 dark:text-zinc-400">
             <span>Orçamento com {data.length} itens</span>
         </div>
 
         <div 
             ref={tableContainerRef}
-            className="w-full h-[65vh] overflow-auto bg-[#09090b] rounded-lg border border-zinc-800 shadow-xl custom-scrollbar"
+            className="w-full h-[65vh] overflow-auto bg-zinc-50 dark:bg-[#09090b] rounded-lg border border-zinc-200 dark:border-zinc-800 shadow-xl custom-scrollbar"
         >
           <div className="w-full text-sm text-left flex flex-col min-w-max">
             {/* Header */}
-            <div className="text-xs uppercase bg-[#18181b] text-zinc-400 border-b border-zinc-800 sticky top-0 z-20 shadow-sm flex select-none">
-              <div className="w-12 shrink-0 bg-[#18181b]"></div>
+            <div className="text-xs uppercase bg-white dark:bg-[#18181b] text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-20 shadow-sm flex select-none">
+              <div className="w-12 shrink-0 bg-white dark:bg-[#18181b]"></div>
               {table.getHeaderGroups().map((headerGroup) => (
                 <div key={headerGroup.id} className="flex flex-1">
                   {headerGroup.headers.map((header) => (
                     <div 
                         key={header.id} 
                         style={{ width: header.getSize(), flexGrow: header.column.id === 'descricao' ? 1 : 0 }} 
-                        className="px-3 py-2 font-medium flex items-center gap-1 shrink-0 relative group hover:bg-zinc-800/50 transition-colors cursor-pointer"
+                        className="px-3 py-2 font-medium flex items-center gap-1 shrink-0 relative group hover:bg-zinc-100 dark:bg-zinc-800/50 transition-colors cursor-pointer"
                         onClick={header.column.getToggleSortingHandler()}
                     >
                       {flexRender(header.column.columnDef.header, header.getContext())}
@@ -506,7 +506,7 @@ export function BudgetTable({
                         key={row.id} 
                         ref={rowVirtualizer.measureElement}
                         data-index={virtualRow.index}
-                        className="group hover:bg-zinc-800/30 transition-colors duration-150 absolute top-0 left-0 w-full flex items-center py-2 z-10 hover:z-[90]"
+                        className="group hover:bg-zinc-100 dark:bg-zinc-800/30 transition-colors duration-150 absolute top-0 left-0 w-full flex items-center py-2 z-10 hover:z-[90]"
                         style={{
                             minHeight: '52px',
                             transform: `translateY(${virtualRow.start}px)`,
@@ -515,18 +515,18 @@ export function BudgetTable({
                         <div className="w-12 relative p-0 m-0 shrink-0 flex items-center justify-center h-full">
                             {/* Ponte invisível para o mouse não perder o hover ao descer para o menu */}
                             <div className="absolute left-8 top-[60%] pt-2 pb-1 px-1 opacity-0 group-hover:opacity-100 transition-all duration-200 z-[70] scale-95 group-hover:scale-100 flex justify-center items-start">
-                                <div className="flex flex-row items-center bg-black rounded-md shadow-[0_10px_40px_-10px_rgba(0,0,0,0.8)] border border-zinc-700 p-1 gap-1 h-9">
+                                <div className="flex flex-row items-center bg-black rounded-md shadow-[0_10px_40px_-10px_rgba(0,0,0,0.8)] border border-zinc-300 dark:border-zinc-700 p-1 gap-1 h-9">
                                 
                                 <button 
                                     onClick={() => alert("Composição detalhada")}
-                                    className="flex flex-row items-center justify-center px-2 py-1 hover:bg-zinc-800 rounded text-zinc-400 hover:text-zinc-100 transition-colors gap-1.5 h-full">
+                                    className="flex flex-row items-center justify-center px-2 py-1 hover:bg-zinc-100 dark:bg-zinc-800 rounded text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:text-zinc-100 transition-colors gap-1.5 h-full">
                                     <Layers className="w-3 h-3" />
                                     <span className="text-[10px] font-medium whitespace-nowrap">Composição</span>
                                 </button>
 
                                 <button 
                                     onClick={() => alert("Trocar Insumo")}
-                                    className="flex flex-row items-center justify-center px-2 py-1 hover:bg-zinc-800 rounded text-zinc-400 hover:text-zinc-100 transition-colors gap-1.5 h-full">
+                                    className="flex flex-row items-center justify-center px-2 py-1 hover:bg-zinc-100 dark:bg-zinc-800 rounded text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:text-zinc-100 transition-colors gap-1.5 h-full">
                                     <Box className="w-3 h-3" />
                                     <span className="text-[10px] font-medium whitespace-nowrap">Insumo</span>
                                 </button>
@@ -546,7 +546,7 @@ export function BudgetTable({
                                         newData.splice(virtualRow.index + 1, 0, {id: Date.now().toString(), item: "Novo", codigo: "", base: "SINAPI", descricao: "", und: "-", quant: 1, valorUnit: 0, total: 0});
                                         setData(newData);
                                     }}
-                                    className="flex flex-row items-center justify-center px-2 py-1 hover:bg-zinc-800 rounded text-zinc-400 hover:text-zinc-100 transition-colors gap-1.5 h-full">
+                                    className="flex flex-row items-center justify-center px-2 py-1 hover:bg-zinc-100 dark:bg-zinc-800 rounded text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:text-zinc-100 transition-colors gap-1.5 h-full">
                                     <Plus className="w-3 h-3" />
                                     <span className="text-[10px] font-medium whitespace-nowrap">Linha</span>
                                 </button>
@@ -580,27 +580,27 @@ export function BudgetTable({
         {/* Modal de Memória de Cálculo (Explainability) */}
         {memoryModalData && (
             <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                <div className="bg-[#18181b] border border-zinc-700 rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
-                    <div className="flex items-center justify-between p-4 border-b border-zinc-800">
+                <div className="bg-white dark:bg-[#18181b] border border-zinc-300 dark:border-zinc-700 rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+                    <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800">
                         <div className="flex items-center gap-2 text-indigo-400">
                             <Brain className="w-5 h-5" />
-                            <h2 className="text-lg font-semibold text-zinc-100">Memória de Cálculo da IA</h2>
+                            <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">Memória de Cálculo da IA</h2>
                         </div>
                         <button 
                             onClick={() => setMemoryModalData(null)}
-                            className="p-1.5 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100 transition-colors"
+                            className="p-1.5 rounded-md hover:bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:text-zinc-100 transition-colors"
                         >
                             <X className="w-4 h-4" />
                         </button>
                     </div>
                     
                     <div className="p-4 overflow-y-auto custom-scrollbar flex flex-col gap-3">
-                        <p className="text-sm text-zinc-400 mb-2">
+                        <p className="text-sm text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 mb-2">
                             A Inteligência Artificial analisou o banco de dados do SINAPI e selecionou as 3 opções matemáticas e semânticas mais prováveis antes de tomar o veredito final:
                         </p>
                         
                         {memoryModalData.matches.map((match: any, idx: number) => (
-                            <div key={idx} className="bg-[#09090b] border border-zinc-800 rounded-lg p-3 flex flex-col gap-2 relative overflow-hidden group/match hover:border-zinc-600 transition-colors">
+                            <div key={idx} className="bg-zinc-50 dark:bg-[#09090b] border border-zinc-200 dark:border-zinc-800 rounded-lg p-3 flex flex-col gap-2 relative overflow-hidden group/match hover:border-zinc-600 transition-colors">
                                 {idx === 0 && (
                                     <div className="absolute top-0 right-0 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-bl-lg border-l border-b border-emerald-500/20">
                                         Vencedor
@@ -613,7 +613,7 @@ export function BudgetTable({
                                     <span className="text-xs font-medium text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20">Match: {match.score}%</span>
                                 </div>
                                 <div className="flex items-start justify-between gap-4">
-                                    <p className="text-sm text-zinc-300 leading-relaxed flex-1">
+                                    <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed flex-1">
                                         {match.descricao}
                                     </p>
                                     <button 
@@ -640,10 +640,10 @@ export function BudgetTable({
                         ))}
                     </div>
                     
-                    <div className="p-4 border-t border-zinc-800 flex justify-end">
+                    <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 flex justify-end">
                         <button 
                             onClick={() => setMemoryModalData(null)}
-                            className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-sm font-medium text-zinc-100 rounded-md transition-colors"
+                            className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-700 text-sm font-medium text-zinc-900 dark:text-zinc-100 rounded-md transition-colors"
                         >
                             Fechar
                         </button>

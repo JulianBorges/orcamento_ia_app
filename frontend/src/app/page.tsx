@@ -1,7 +1,8 @@
 "use client";
 import { useState, useRef, useMemo, useEffect } from "react";
-import { UploadCloud, Loader2, Settings, Plus, Download, Trash2, AlertCircle, Sparkles } from "lucide-react";
+import { UploadCloud, Loader2, Plus, Download, Trash2, AlertCircle, Sparkles } from "lucide-react";
 import { BudgetTable, BudgetItem } from "@/components/BudgetTable";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { CompositionCreatorModal, ComposicaoGerada } from "@/components/CompositionCreatorModal";
 import * as XLSX from "xlsx";
 
@@ -309,17 +310,15 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-[#09090b] text-zinc-100 font-sans selection:bg-indigo-500/30">
+    <div className="min-h-screen bg-zinc-50 dark:bg-[#09090b] text-zinc-900 dark:text-zinc-100 font-sans selection:bg-indigo-500/30">
       {/* Header Minimalista */}
-      <header className="border-b border-zinc-800 bg-[#09090b]/80 backdrop-blur-md sticky top-0 z-50">
+      <header className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#09090b]/80 backdrop-blur-md sticky top-0 z-50">
         <div className="w-full max-w-[1600px] mx-auto px-4 xl:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="font-semibold tracking-tight text-zinc-100">Copiloto <span className="text-zinc-500 font-light">Orçamento</span></span>
+            <span className="font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">Copiloto <span className="text-zinc-400 dark:text-zinc-500 font-light">Orçamento</span></span>
           </div>
           <div className="flex items-center gap-4">
-              <button className="p-2 rounded-md hover:bg-zinc-800 text-zinc-400 transition-colors">
-                <Settings className="w-4 h-4" />
-              </button>
+              <ThemeToggle />
           </div>
         </div>
       </header>
@@ -332,31 +331,31 @@ export default function Home() {
                 type="text" 
                 value={title} 
                 onChange={e => setTitle(e.target.value)}
-                className="text-2xl font-semibold tracking-tight bg-transparent outline-none border-none focus:ring-0 w-full max-w-lg text-zinc-100 placeholder:text-zinc-600 truncate"
+                className="text-2xl font-semibold tracking-tight bg-transparent outline-none border-none focus:ring-0 w-full max-w-lg text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-600 truncate"
                 placeholder="Nome do Orçamento..."
             />
-            <p className="text-sm text-zinc-400 mt-1">Gerencie itens, insumos e composições com IA.</p>
+            <p className="text-sm text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 mt-1">Gerencie itens, insumos e composições com IA.</p>
           </div>
           
           <div className="flex items-center gap-6">
               {tableData.length > 0 && (
-                  <div className="flex items-center gap-6 mr-4 bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50 shadow-inner">
+                  <div className="flex items-center gap-6 mr-4 bg-white dark:bg-zinc-900/50 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800/50 shadow-inner">
                       <div className="flex flex-col">
-                          <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 mb-0.5">BDI (%)</span>
-                          <div className="flex items-center gap-1 bg-zinc-800 rounded px-2 py-1 focus-within:ring-2 focus-within:ring-indigo-500/50">
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400 dark:text-zinc-500 mb-0.5">BDI (%)</span>
+                          <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 rounded px-2 py-1 focus-within:ring-2 focus-within:ring-indigo-500/50">
                               <input 
                                   type="number" 
                                   value={bdi} 
                                   onChange={e => setBdi(parseFloat(e.target.value) || 0)}
-                                  className="w-14 bg-transparent text-sm font-medium text-zinc-300 outline-none"
+                                  className="w-14 bg-transparent text-sm font-medium text-zinc-700 dark:text-zinc-300 outline-none"
                                   step="0.1"
                               />
-                              <span className="text-xs text-zinc-500">%</span>
+                              <span className="text-xs text-zinc-400 dark:text-zinc-500">%</span>
                           </div>
                       </div>
-                      <div className="w-px h-8 bg-zinc-800"></div>
+                      <div className="w-px h-8 bg-zinc-100 dark:bg-zinc-800"></div>
                       <div className="flex flex-col">
-                          <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-500 mb-0.5">Total do Orçamento (c/ BDI)</span>
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400 dark:text-zinc-500 mb-0.5">Total do Orçamento (c/ BDI)</span>
                           <span className="text-2xl font-bold text-emerald-400 tracking-tight">
                               {totalComBdi.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                           </span>
@@ -365,12 +364,12 @@ export default function Home() {
               )}
 
               {uploadProgress !== null && (
-                  <div className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 rounded-full px-4 py-1.5 shadow-inner">
+                  <div className="flex items-center gap-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full px-4 py-1.5 shadow-inner">
                       <Loader2 className="w-4 h-4 text-indigo-400 animate-spin" />
-                      <div className="w-32 h-2 bg-zinc-800 rounded-full overflow-hidden">
+                      <div className="w-32 h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
                           <div className="h-full bg-indigo-500 transition-all duration-300 ease-out" style={{ width: `${uploadProgress}%` }}></div>
                       </div>
-                      <span className="text-xs font-medium text-zinc-400 font-mono">{uploadProgress}%</span>
+                      <span className="text-xs font-medium text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 font-mono">{uploadProgress}%</span>
                   </div>
               )}
               
@@ -380,7 +379,7 @@ export default function Home() {
                   <button 
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isProcessing}
-                    className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-sm font-medium rounded-md transition-colors disabled:opacity-50 shadow-lg"
+                    className="flex items-center gap-2 px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-700 text-sm font-medium rounded-md transition-colors disabled:opacity-50 shadow-lg"
                   >
                     <UploadCloud className="w-4 h-4" /> Importar Excel
                   </button>
@@ -404,12 +403,12 @@ export default function Home() {
 
         {/* Footer Actions */}
         {tableData.length > 0 && (
-            <div className="flex items-center justify-between mt-4 pt-4 border-t border-zinc-800">
+            <div className="flex items-center justify-between mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-800">
                 <div className="flex items-center gap-3">
                     <button 
                         onClick={() => fileInputRef.current?.click()}
                         disabled={isProcessing}
-                        className="flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium rounded-md transition-colors disabled:opacity-50"
+                        className="flex items-center gap-2 px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-sm font-medium rounded-md transition-colors disabled:opacity-50"
                     >
                         <Plus className="w-4 h-4" /> Carregar Mais Itens
                     </button>
@@ -435,18 +434,18 @@ export default function Home() {
         {/* Modal de Confirmação de Upload */}
         {showUploadDialog && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-                <div className="bg-[#18181b] border border-zinc-700 p-6 rounded-xl shadow-2xl max-w-md w-full">
-                    <div className="flex items-center gap-3 text-zinc-100 mb-4">
+                <div className="bg-white dark:bg-[#18181b] border border-zinc-300 dark:border-zinc-700 p-6 rounded-xl shadow-2xl max-w-md w-full">
+                    <div className="flex items-center gap-3 text-zinc-900 dark:text-zinc-100 mb-4">
                         <AlertCircle className="w-6 h-6 text-indigo-400" />
                         <h2 className="text-xl font-semibold">Planilha Detectada</h2>
                     </div>
-                    <p className="text-zinc-400 text-sm mb-6">
+                    <p className="text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 text-sm mb-6">
                         Você já possui itens no orçamento atual. Deseja substituir tudo pela nova planilha ou acrescentar os novos itens ao final da lista?
                     </p>
                     <div className="flex items-center gap-3 justify-end">
                         <button 
                             onClick={() => setShowUploadDialog(false)}
-                            className="px-4 py-2 text-sm font-medium text-zinc-400 hover:text-zinc-200 transition-colors"
+                            className="px-4 py-2 text-sm font-medium text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-200 transition-colors"
                         >
                             Cancelar
                         </button>
