@@ -46,8 +46,55 @@ const CellInput = ({ initialValue, onUpdate, type = "text", className = "", step
             value={val}
             onChange={e => setVal(e.target.value)}
             onBlur={() => onUpdate(type === 'number' ? (parseFloat(val) || 0) : val)}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === 'Escape') {
+                    e.currentTarget.blur();
+                }
+            }}
             className={className}
         />
+    );
+};
+
+const CodigoCell = ({ initialValue, onUpdate }: any) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [val, setVal] = useState(initialValue);
+
+    useEffect(() => { setVal(initialValue); }, [initialValue]);
+
+    if (isEditing) {
+        return (
+            <input 
+                type="text"
+                value={val}
+                autoFocus
+                onChange={e => setVal(e.target.value)}
+                onBlur={() => {
+                    setIsEditing(false);
+                    onUpdate(val);
+                }}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === 'Escape') {
+                        e.currentTarget.blur();
+                    }
+                }}
+                className="w-full bg-zinc-800 text-blue-400 outline-none px-1 rounded cursor-text"
+            />
+        );
+    }
+
+    return (
+        <div 
+            onDoubleClick={() => setIsEditing(true)}
+            onClick={() => {
+                if (!initialValue || initialValue === '-') return;
+                alert("Abertura detalhada da composição " + initialValue + " (SINAPI ou Própria) em desenvolvimento!");
+            }}
+            className="w-full bg-transparent text-blue-400 px-1 rounded cursor-pointer hover:bg-zinc-800/50 hover:underline decoration-blue-500/50 underline-offset-4 truncate"
+            title="Clique para abrir, duplo clique para editar"
+        >
+            {initialValue || '-'}
+        </div>
     );
 };
 
@@ -143,6 +190,11 @@ const AutocompleteDescricaoCell = ({ initialValue, rowIndex, onUpdateRow }: any)
                             e.preventDefault();
                             onUpdateRow({ descricao: val });
                             setIsOpen(false);
+                            textareaRef.current?.blur();
+                        }
+                        if (e.key === 'Escape') {
+                            setIsOpen(false);
+                            textareaRef.current?.blur();
                         }
                     }}
                     className="w-full bg-transparent text-zinc-300 outline-none focus:bg-zinc-800 px-1 py-1 rounded resize-none cursor-text block leading-snug overflow-hidden"
@@ -192,7 +244,7 @@ export function BudgetTable({
     data: BudgetItem[], 
     setData: React.Dispatch<React.SetStateAction<BudgetItem[]>>,
     bdi?: number,
-    onOpenCreatorModal?: (query: string) => void
+    onOpenCreatorModal?: (query: string, rowIndex?: number) => void
 }) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [memoryModalData, setMemoryModalData] = useState<{ matches: any[], rowIndex: number } | null>(null);
@@ -253,7 +305,7 @@ export function BudgetTable({
     columnHelper.accessor("codigo", { 
         header: "Código", 
         size: 100,
-        cell: info => <CellInput initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'codigo', v)} className="w-full bg-transparent text-blue-400 outline-none focus:bg-zinc-800 px-1 rounded cursor-text" />
+        cell: info => <CodigoCell initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'codigo', v)} />
     }),
     columnHelper.accessor("base", { 
         header: "Base", 
@@ -480,7 +532,7 @@ export function BudgetTable({
                                 </button>
 
                                 <button 
-                                    onClick={() => onOpenCreatorModal && onOpenCreatorModal(row.original.descricao)}
+                                    onClick={() => onOpenCreatorModal && onOpenCreatorModal(row.original.descricao, virtualRow.index)}
                                     className="flex flex-row items-center justify-center px-2 py-1 hover:bg-indigo-500/10 rounded text-indigo-400 hover:text-indigo-300 transition-colors gap-1.5 h-full"
                                     title="Criar Composição Inédita baseada nesta linha"
                                 >

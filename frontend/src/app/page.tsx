@@ -11,6 +11,7 @@ export default function Home() {
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showCreatorModal, setShowCreatorModal] = useState(false);
   const [creatorInitialQuery, setCreatorInitialQuery] = useState("");
+  const [creatorTargetRowIndex, setCreatorTargetRowIndex] = useState<number | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -282,19 +283,29 @@ export default function Home() {
 
   const handleAddCustomComposition = (composicao: ComposicaoGerada, originalQuery: string) => {
       const newItem: BudgetItem = {
-          id: `r_${Date.now()}_custom`,
-          item: `1.${tableData.length + 1}`,
+          id: creatorTargetRowIndex !== null ? tableData[creatorTargetRowIndex].id : `r_${Date.now()}_custom`,
+          item: creatorTargetRowIndex !== null ? tableData[creatorTargetRowIndex].item : `1.${tableData.length + 1}`,
           codigo: 'IA CUSTOM',
           base: 'IA CUSTOM',
           descricao: composicao.servico,
           und: composicao.unidade_medida,
-          quant: 1.0,
+          quant: creatorTargetRowIndex !== null ? tableData[creatorTargetRowIndex].quant : 1.0,
           valorUnit: composicao.valor_total_composicao,
-          total: composicao.valor_total_composicao,
+          total: composicao.valor_total_composicao * (creatorTargetRowIndex !== null ? tableData[creatorTargetRowIndex].quant : 1.0),
           ai_status: 'ACEITO',
           ai_justificativa: `Composição Inédita Gerada por IA baseada na requisição: "${originalQuery}".\n\nAuditoria: ${composicao.justificativa}`
       };
-      setTableData([...tableData, newItem]);
+
+      if (creatorTargetRowIndex !== null) {
+          // Substituir linha existente
+          const newData = [...tableData];
+          newData[creatorTargetRowIndex] = newItem;
+          setTableData(newData);
+      } else {
+          // Adicionar no final
+          setTableData([...tableData, newItem]);
+      }
+      setCreatorTargetRowIndex(null);
   };
 
   return (
@@ -383,8 +394,9 @@ export default function Home() {
               data={tableData} 
               setData={setTableData} 
               bdi={bdi} 
-              onOpenCreatorModal={(q) => {
+              onOpenCreatorModal={(q, rowIndex) => {
                   setCreatorInitialQuery(q);
+                  setCreatorTargetRowIndex(rowIndex ?? null);
                   setShowCreatorModal(true);
               }}
           />
