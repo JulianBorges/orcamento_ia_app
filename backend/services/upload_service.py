@@ -8,9 +8,9 @@ from services.ai_service import buscar_verdadeiro_hibrido_async, fluxo_multi_age
 
 from models.schemas import StatelessBatchItem
 
-# Semáforo global para não estourar os limites de concorrência da OpenAI (RPM)
-# Reduzido para 5 para garantir que a IA processe lotes massivos (+5000) sem falhar.
-openai_semaphore = asyncio.Semaphore(5)
+# Semáforo global para concorrência da OpenAI
+# Aumentado para 50 para processamento ultra-rápido de lotes, confiando no retry backoff em caso de Rate Limit
+openai_semaphore = asyncio.Semaphore(50)
 
 async def process_item_with_semaphore(item: StatelessBatchItem, ai_function, *args):
     """Executa uma função de IA respeitando o limite do semáforo com retentativas (Retry Logic)."""
@@ -18,8 +18,6 @@ async def process_item_with_semaphore(item: StatelessBatchItem, ai_function, *ar
     async with openai_semaphore:
         for attempt in range(max_retries):
             try:
-                # Simulando o tempo de rede e limitando rate limits
-                await asyncio.sleep(0.5) 
                 resultado = await ai_function(item, *args)
                 
                 # Se a função interna retornou ERRO por Rate Limit ou Timeout, lançamos a exceção para ativar o Retry

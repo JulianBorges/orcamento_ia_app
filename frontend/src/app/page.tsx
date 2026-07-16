@@ -149,8 +149,8 @@ export default function Home() {
         let currentTableData = append ? [...tableData, ...initialItems] : initialItems;
         setTableData(currentTableData);
         
-        // Chunker (Lotes de 25)
-        const chunkSize = 25;
+        // Chunker (Lotes de 50 para máxima velocidade)
+        const chunkSize = 50;
         let completed = 0;
         
         for (let i = 0; i < rows.length; i += chunkSize) {
