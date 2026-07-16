@@ -184,6 +184,16 @@ export function BudgetTable({
   const [sorting, setSorting] = useState<SortingState>([]);
   const [memoryModalData, setMemoryModalData] = useState<any[] | null>(null);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape' && memoryModalData) {
+            setMemoryModalData(null);
+        }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [memoryModalData]);
+
   const updateData = React.useCallback((rowIndex: number, columnId: string, value: any) => {
       setData(old =>
         old.map((row, index) => {
@@ -291,13 +301,13 @@ export function BudgetTable({
                     <div className={`px-2 py-0.5 rounded-full text-[10px] font-semibold w-max ${color} cursor-help truncate max-w-full`}>
                         {label}
                     </div>
-                    {/* Custom Instant Tooltip */}
+                    {/* Custom Instant Tooltip (ao lado) */}
                     {just && (
-                        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-64 p-3 bg-[#18181b] border border-zinc-700 rounded-lg shadow-2xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-100 z-[9999] text-xs text-zinc-300 font-normal whitespace-normal leading-relaxed pointer-events-none">
+                        <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 w-64 p-3 bg-[#18181b] border border-zinc-700 rounded-lg shadow-2xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-100 z-[9999] text-xs text-zinc-300 font-normal whitespace-normal leading-relaxed pointer-events-none">
                             <div className="font-semibold text-zinc-100 mb-1">{label}</div>
                             {just}
-                            {/* Seta do tooltip */}
-                            <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#18181b] border-b border-r border-zinc-700 rotate-45"></div>
+                            {/* Seta do tooltip apontando para a esquerda */}
+                            <div className="absolute top-1/2 -translate-y-1/2 -left-1.5 w-3 h-3 bg-[#18181b] border-l border-t border-zinc-700 -rotate-45"></div>
                         </div>
                     )}
                 </div>

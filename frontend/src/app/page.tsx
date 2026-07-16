@@ -214,10 +214,11 @@ export default function Home() {
   };
 
   const clearBudget = () => {
-      if (confirm("Tem certeza que deseja limpar todo o orçamento? Esta ação não pode ser desfeita.")) {
+      if (window.confirm("Tem certeza que deseja limpar todo o orçamento? Esta ação não pode ser desfeita.")) {
           setTableData([]);
           setTitle("Orçamento Base");
           setBdi(25.0);
+          if (fileInputRef.current) fileInputRef.current.value = "";
       }
   };
 
