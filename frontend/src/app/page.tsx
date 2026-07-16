@@ -238,31 +238,27 @@ export default function Home() {
       }
   };
 
-  const downloadCSV = () => {
+  const downloadExcel = () => {
       if (tableData.length === 0) return;
       
-      const headers = ["Item", "Código", "Base", "Descrição", "Und", "Quant", "Valor Unit", "Valor c/ BDI", "Total", "Parecer IA"];
-      const rows = tableData.map(row => [
-          row.item,
-          row.codigo,
-          row.base,
-          `"${(row.descricao || '').replace(/"/g, '""')}"`,
-          row.und,
-          row.quant,
-          row.valorUnit,
-          (row.valorUnit * (1 + bdi/100)).toFixed(2),
-          ((row.valorUnit * (1 + bdi/100)) * row.quant).toFixed(2),
-          row.ai_status || ''
-      ].join(","));
+      const exportData = tableData.map(row => ({
+          "Item": row.item,
+          "Código": row.codigo,
+          "Base": row.base,
+          "Descrição": row.descricao || '',
+          "Und": row.und,
+          "Quant": Number(row.quant),
+          "Valor Unit": Number(row.valorUnit),
+          "Valor c/ BDI": Number((row.valorUnit * (1 + bdi/100)).toFixed(2)),
+          "Total": Number(((row.valorUnit * (1 + bdi/100)) * row.quant).toFixed(2)),
+          "Parecer IA": row.ai_status || ''
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Orçamento");
       
-      const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(","), ...rows].join("\n");
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `${title.replace(/\s+/g, '_')}_${new Date().getTime()}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      XLSX.writeFile(workbook, `${title.replace(/\s+/g, '_')}_${new Date().getTime()}.xlsx`);
   };
 
   return (
@@ -369,11 +365,11 @@ export default function Home() {
                 </div>
                 
                 <button 
-                    onClick={downloadCSV}
+                    onClick={downloadExcel}
                     disabled={isProcessing}
                     className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-md transition-colors shadow-lg disabled:opacity-50"
                 >
-                    <Download className="w-4 h-4" /> Download CSV
+                    <Download className="w-4 h-4" /> Download
                 </button>
             </div>
         )}
