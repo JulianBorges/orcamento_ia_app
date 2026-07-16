@@ -21,15 +21,24 @@ export interface ComposicaoGerada {
 
 interface CompositionCreatorModalProps {
     isOpen: boolean;
+    initialQuery?: string;
     onClose: () => void;
     onAddComposition: (composicao: ComposicaoGerada, query: string) => void;
 }
 
-export function CompositionCreatorModal({ isOpen, onClose, onAddComposition }: CompositionCreatorModalProps) {
-    const [query, setQuery] = useState('');
+export function CompositionCreatorModal({ isOpen, initialQuery = '', onClose, onAddComposition }: CompositionCreatorModalProps) {
+    const [query, setQuery] = useState(initialQuery);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [result, setResult] = useState<ComposicaoGerada | null>(null);
+
+    React.useEffect(() => {
+        if (isOpen) {
+            setQuery(initialQuery);
+            setResult(null);
+            setError(null);
+        }
+    }, [isOpen, initialQuery]);
 
     if (!isOpen) return null;
 

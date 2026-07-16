@@ -10,6 +10,7 @@ export default function Home() {
   const [title, setTitle] = useState("Orçamento Base");
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showCreatorModal, setShowCreatorModal] = useState(false);
+  const [creatorInitialQuery, setCreatorInitialQuery] = useState("");
   const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -28,7 +29,7 @@ export default function Home() {
                   oldItem.id === nextUpdate.id ? nextUpdate : oldItem
               ));
           }
-      }, 650);
+      }, 500);
       return () => clearInterval(interval);
   }, []);
 
@@ -305,12 +306,6 @@ export default function Home() {
             <span className="font-semibold tracking-tight text-zinc-100">Copiloto <span className="text-zinc-500 font-light">Orçamento</span></span>
           </div>
           <div className="flex items-center gap-4">
-              <button 
-                  onClick={() => setShowCreatorModal(true)}
-                  className="flex items-center gap-2 px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 text-sm font-medium rounded-md transition-colors border border-indigo-500/20"
-              >
-                  <Sparkles className="w-4 h-4" /> Criar Composição (IA)
-              </button>
               <button className="p-2 rounded-md hover:bg-zinc-800 text-zinc-400 transition-colors">
                 <Settings className="w-4 h-4" />
               </button>
@@ -384,7 +379,15 @@ export default function Home() {
 
         {/* Tabela Wrapper */}
         <div className="w-full mt-6 flex-1 h-full">
-          <BudgetTable data={tableData} setData={setTableData} bdi={bdi} />
+          <BudgetTable 
+              data={tableData} 
+              setData={setTableData} 
+              bdi={bdi} 
+              onOpenCreatorModal={(q) => {
+                  setCreatorInitialQuery(q);
+                  setShowCreatorModal(true);
+              }}
+          />
         </div>
 
         {/* Footer Actions */}
@@ -454,6 +457,7 @@ export default function Home() {
 
         <CompositionCreatorModal 
             isOpen={showCreatorModal}
+            initialQuery={creatorInitialQuery}
             onClose={() => setShowCreatorModal(false)}
             onAddComposition={handleAddCustomComposition}
         />

@@ -186,11 +186,13 @@ const AutocompleteDescricaoCell = ({ initialValue, rowIndex, onUpdateRow }: any)
 export function BudgetTable({ 
     data = [], 
     setData,
-    bdi = 25 
+    bdi = 25,
+    onOpenCreatorModal
 }: { 
     data: BudgetItem[], 
     setData: React.Dispatch<React.SetStateAction<BudgetItem[]>>,
-    bdi?: number 
+    bdi?: number,
+    onOpenCreatorModal?: (query: string) => void
 }) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [memoryModalData, setMemoryModalData] = useState<{ matches: any[], rowIndex: number } | null>(null);
@@ -478,8 +480,10 @@ export function BudgetTable({
                                 </button>
 
                                 <button 
-                                    onClick={() => alert(`Agente IA vai processar!`)}
-                                    className="flex flex-row items-center justify-center px-2 py-1 hover:bg-indigo-500/10 rounded text-indigo-400 hover:text-indigo-300 transition-colors gap-1.5 h-full">
+                                    onClick={() => onOpenCreatorModal && onOpenCreatorModal(row.original.descricao)}
+                                    className="flex flex-row items-center justify-center px-2 py-1 hover:bg-indigo-500/10 rounded text-indigo-400 hover:text-indigo-300 transition-colors gap-1.5 h-full"
+                                    title="Criar Composição Inédita baseada nesta linha"
+                                >
                                     <Wand2 className="w-3 h-3" />
                                     <span className="text-[10px] font-medium whitespace-nowrap">Auto IA</span>
                                 </button>
