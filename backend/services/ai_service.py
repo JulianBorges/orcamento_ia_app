@@ -48,13 +48,14 @@ def lexical_reranker(query: str, semantic_matches: list) -> list:
         return []
         
     # 1. Normalização da Query
-    # Remove espaços antes de unidades comuns de engenharia para padronizar
-    # Exemplo: "50 mm" vira "50mm", "200 KG" vira "200kg"
+    # Remove espaços antes de unidades para padronizar.
+    # Agora suporta decimais e frações. Exemplo: "50 mm" -> "50mm", "1,5 m" -> "1,5m", "3/4 pol" -> "3/4pol"
     norm_query = query.lower()
-    norm_query = re.sub(r'(\d+)\s*(mm|cm|m|kg|m2|m3|l|w|v)', r'\1\2', norm_query)
+    norm_query = re.sub(r'(\d+(?:[.,/]\d+)?)\s*(mm|cm|m|kg|m2|m3|l|w|v|in|pol|")', r'\1\2', norm_query)
     
-    # Extrai tokens (palavras) com 2+ caracteres ou números
-    query_tokens = set(re.findall(r'\b\w+\b', norm_query))
+    # Extrai tokens (palavras) removendo apenas pontuações soltas nas pontas para manter decimais inteiros
+    raw_tokens = norm_query.split()
+    query_tokens = set(t.strip('.,;:()[]{}!') for t in raw_tokens if t.strip('.,;:()[]{}!'))
     if not query_tokens:
         return semantic_matches
 
@@ -62,14 +63,16 @@ def lexical_reranker(query: str, semantic_matches: list) -> list:
     for match in semantic_matches:
         # Pega a descrição do banco e normaliza com a mesma regra
         desc = match.get('metadata', {}).get('descricao', '').lower()
-        norm_desc = re.sub(r'(\d+)\s*(mm|cm|m|kg|m2|m3|l|w|v)', r'\1\2', desc)
-        desc_tokens = set(re.findall(r'\b\w+\b', norm_desc))
+        norm_desc = re.sub(r'(\d+(?:[.,/]\d+)?)\s*(mm|cm|m|kg|m2|m3|l|w|v|in|pol|")', r'\1\2', desc)
+        
+        desc_raw_tokens = norm_desc.split()
+        desc_tokens = set(t.strip('.,;:()[]{}!') for t in desc_raw_tokens if t.strip('.,;:()[]{}!'))
         
         lexical_score = 0.0
         
         for token in query_tokens:
             if token in desc_tokens:
-                # Recompensa gigante se for um número ou dimensão (ex: '50', '50mm', '3/4')
+                # Recompensa gigante se for um número ou dimensão (ex: '50', '50mm', '1,5m', '3/4')
                 if any(char.isdigit() for char in token):
                     lexical_score += 5.0
                 else:
