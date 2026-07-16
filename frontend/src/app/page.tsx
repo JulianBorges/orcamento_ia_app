@@ -310,9 +310,9 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-[#09090b] text-zinc-900 dark:text-zinc-100 font-sans selection:bg-indigo-500/30">
+    <div className="min-h-screen bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-sans selection:bg-indigo-500/30">
       {/* Header Minimalista */}
-      <header className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#09090b]/80 backdrop-blur-md sticky top-0 z-50">
+      <header className="border-b border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900/80 backdrop-blur-md sticky top-0 z-50">
         <div className="w-full max-w-[1600px] mx-auto px-4 xl:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">Copiloto <span className="text-zinc-400 dark:text-zinc-500 font-light">Orçamento</span></span>
@@ -342,12 +342,12 @@ export default function Home() {
                   <div className="flex items-center gap-6 mr-4 bg-white dark:bg-zinc-900/50 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800/50 shadow-inner">
                       <div className="flex flex-col">
                           <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400 dark:text-zinc-500 mb-0.5">BDI (%)</span>
-                          <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 rounded px-2 py-1 focus-within:ring-2 focus-within:ring-indigo-500/50">
+                          <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-900 rounded px-2 py-1 focus-within:ring-2 focus-within:ring-indigo-500/50">
                               <input 
                                   type="number" 
                                   value={bdi} 
                                   onChange={e => setBdi(parseFloat(e.target.value) || 0)}
-                                  className="w-14 bg-transparent text-sm font-medium text-zinc-700 dark:text-zinc-300 outline-none"
+                                  className="w-14 bg-transparent text-sm font-medium text-zinc-700 dark:text-zinc-300 outline-none text-center"
                                   step="0.1"
                               />
                               <span className="text-xs text-zinc-400 dark:text-zinc-500">%</span>

@@ -90,7 +90,7 @@ const CodigoCell = ({ initialValue, onUpdate }: any) => {
                 if (!initialValue || initialValue === '-') return;
                 alert("Abertura detalhada da composição " + initialValue + " (SINAPI ou Própria) em desenvolvimento!");
             }}
-            className="w-full bg-transparent text-blue-400 px-1 rounded cursor-pointer hover:bg-zinc-100 dark:bg-zinc-800/50 hover:underline decoration-blue-500/50 underline-offset-4 truncate"
+            className="w-full bg-transparent text-blue-400 px-1 rounded cursor-pointer hover:bg-zinc-100 dark:bg-zinc-800/50 hover:underline decoration-blue-500/50 underline-offset-4 truncate text-center"
             title="Clique para abrir, duplo clique para editar"
         >
             {initialValue || '-'}
@@ -300,7 +300,7 @@ export function BudgetTable({
     columnHelper.accessor("item", { 
         header: "Item", 
         size: 70,
-        cell: info => <CellInput initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'item', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 font-semibold outline-none focus:bg-zinc-100 dark:bg-zinc-800 px-1 rounded" />
+        cell: info => <CellInput initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'item', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 font-semibold outline-none focus:bg-zinc-100 dark:bg-zinc-800 px-1 rounded text-center" />
     }),
     columnHelper.accessor("codigo", { 
         header: "Código", 
@@ -310,7 +310,7 @@ export function BudgetTable({
     columnHelper.accessor("base", { 
         header: "Base", 
         size: 80,
-        cell: info => <CellInput initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'base', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 outline-none focus:bg-zinc-100 dark:bg-zinc-800 px-1 rounded" />
+        cell: info => <CellInput initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'base', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 outline-none focus:bg-zinc-100 dark:bg-zinc-800 px-1 rounded text-center" />
     }),
     columnHelper.accessor("descricao", { 
         header: "Descrição do Serviço",
@@ -387,12 +387,12 @@ export function BudgetTable({
     columnHelper.accessor("quant", { 
         header: "Quant.", 
         size: 90,
-        cell: info => <CellInput type="number" step="0.01" initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'quant', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 outline-none focus:bg-zinc-100 dark:bg-zinc-800 px-1 rounded text-right" />
+        cell: info => <CellInput type="number" step="0.01" initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'quant', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 outline-none focus:bg-zinc-100 dark:bg-zinc-800 px-1 rounded text-center" />
     }),
     columnHelper.accessor("valorUnit", { 
         header: "Valor Unit", 
         size: 110,
-        cell: info => <CellInput type="number" step="0.01" initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'valorUnit', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 outline-none focus:bg-zinc-100 dark:bg-zinc-800 px-1 rounded text-right" />
+        cell: info => <CellInput type="number" step="0.01" initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'valorUnit', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 outline-none focus:bg-zinc-100 dark:bg-zinc-800 px-1 rounded text-center" />
     }),
     columnHelper.display({
         id: "valorUnitBdi",
@@ -400,7 +400,7 @@ export function BudgetTable({
         size: 110,
         cell: info => {
             const val = info.row.original.valorUnit * (1 + bdi / 100);
-            return <div className="text-right px-1 text-zinc-700 dark:text-zinc-300 w-full">{val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>;
+            return <div className="text-center px-1 text-zinc-700 dark:text-zinc-300 w-full">{val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>;
         }
     }),
     columnHelper.display({
@@ -409,7 +409,7 @@ export function BudgetTable({
         size: 130,
         cell: info => {
             const val = (info.row.original.valorUnit * (1 + bdi / 100)) * info.row.original.quant;
-            return <div className="text-right px-1 font-semibold text-zinc-800 dark:text-zinc-200 w-full">{val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>;
+            return <div className="text-center px-1 font-semibold text-zinc-800 dark:text-zinc-200 w-full">{val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>;
         }
     })
   ], [bdi, updateData]);
@@ -456,19 +456,18 @@ export function BudgetTable({
 
         <div 
             ref={tableContainerRef}
-            className="w-full h-[65vh] overflow-auto bg-zinc-50 dark:bg-[#09090b] rounded-lg border border-zinc-200 dark:border-zinc-800 shadow-xl custom-scrollbar"
+            className="w-full h-[65vh] overflow-auto bg-zinc-50 dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 shadow-xl custom-scrollbar"
         >
           <div className="w-full text-sm text-left flex flex-col min-w-max">
             {/* Header */}
-            <div className="text-xs uppercase bg-white dark:bg-[#18181b] text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 border-b border-zinc-200 dark:border-zinc-800 sticky top-0 z-20 shadow-sm flex select-none">
-              <div className="w-12 shrink-0 bg-white dark:bg-[#18181b]"></div>
+            <div className="text-xs uppercase bg-white dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 border-b border-zinc-200 dark:border-zinc-700 sticky top-0 z-20 shadow-sm flex select-none">
               {table.getHeaderGroups().map((headerGroup) => (
                 <div key={headerGroup.id} className="flex flex-1">
                   {headerGroup.headers.map((header) => (
                     <div 
                         key={header.id} 
                         style={{ width: header.getSize(), flexGrow: header.column.id === 'descricao' ? 1 : 0 }} 
-                        className="px-3 py-2 font-medium flex items-center gap-1 shrink-0 relative group hover:bg-zinc-100 dark:bg-zinc-800/50 transition-colors cursor-pointer"
+                        className={`px-3 py-2 font-medium flex items-center gap-1 shrink-0 relative group hover:bg-zinc-100 dark:hover:bg-zinc-700/50 transition-colors cursor-pointer ${header.column.id === 'descricao' ? 'justify-start' : 'justify-center text-center'}`}
                         onClick={header.column.getToggleSortingHandler()}
                     >
                       {flexRender(header.column.columnDef.header, header.getContext())}
@@ -512,54 +511,52 @@ export function BudgetTable({
                             transform: `translateY(${virtualRow.start}px)`,
                         }}
                     >
-                        <div className="w-12 relative p-0 m-0 shrink-0 flex items-center justify-center h-full">
-                            {/* Ponte invisível para o mouse não perder o hover ao descer para o menu */}
-                            <div className="absolute left-8 top-[60%] pt-2 pb-1 px-1 opacity-0 group-hover:opacity-100 transition-all duration-200 z-[70] scale-95 group-hover:scale-100 flex justify-center items-start">
-                                <div className="flex flex-row items-center bg-black rounded-md shadow-[0_10px_40px_-10px_rgba(0,0,0,0.8)] border border-zinc-300 dark:border-zinc-700 p-1 gap-1 h-9">
-                                
-                                <button 
-                                    onClick={() => alert("Composição detalhada")}
-                                    className="flex flex-row items-center justify-center px-2 py-1 hover:bg-zinc-100 dark:bg-zinc-800 rounded text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:text-zinc-100 transition-colors gap-1.5 h-full">
-                                    <Layers className="w-3 h-3" />
-                                    <span className="text-[10px] font-medium whitespace-nowrap">Composição</span>
-                                </button>
+                        {/* Menu de Contexto Invisível */}
+                        <div className="absolute left-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all duration-200 z-[70] scale-95 group-hover:scale-100 flex justify-center items-center pointer-events-none group-hover:pointer-events-auto">
+                            <div className="flex flex-row items-center bg-white dark:bg-zinc-800 rounded-md shadow-lg border border-zinc-200 dark:border-zinc-700 p-1 gap-1 h-9">
+                            
+                            <button 
+                                onClick={() => alert("Composição detalhada")}
+                                className="flex flex-row items-center justify-center px-2 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors gap-1.5 h-full">
+                                <Layers className="w-3 h-3" />
+                                <span className="text-[10px] font-medium whitespace-nowrap">Composição</span>
+                            </button>
 
-                                <button 
-                                    onClick={() => alert("Trocar Insumo")}
-                                    className="flex flex-row items-center justify-center px-2 py-1 hover:bg-zinc-100 dark:bg-zinc-800 rounded text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:text-zinc-100 transition-colors gap-1.5 h-full">
-                                    <Box className="w-3 h-3" />
-                                    <span className="text-[10px] font-medium whitespace-nowrap">Insumo</span>
-                                </button>
+                            <button 
+                                onClick={() => alert("Trocar Insumo")}
+                                className="flex flex-row items-center justify-center px-2 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors gap-1.5 h-full">
+                                <Box className="w-3 h-3" />
+                                <span className="text-[10px] font-medium whitespace-nowrap">Insumo</span>
+                            </button>
 
-                                <button 
-                                    onClick={() => onOpenCreatorModal && onOpenCreatorModal(row.original.descricao, virtualRow.index)}
-                                    className="flex flex-row items-center justify-center px-2 py-1 hover:bg-indigo-500/10 rounded text-indigo-400 hover:text-indigo-300 transition-colors gap-1.5 h-full"
-                                    title="Criar Composição Inédita baseada nesta linha"
-                                >
-                                    <Wand2 className="w-3 h-3" />
-                                    <span className="text-[10px] font-medium whitespace-nowrap">Auto IA</span>
-                                </button>
+                            <button 
+                                onClick={() => onOpenCreatorModal && onOpenCreatorModal(row.original.descricao, virtualRow.index)}
+                                className="flex flex-row items-center justify-center px-2 py-1 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors gap-1.5 h-full"
+                                title="Criar Composição Inédita baseada nesta linha"
+                            >
+                                <Wand2 className="w-3 h-3" />
+                                <span className="text-[10px] font-medium whitespace-nowrap">Auto IA</span>
+                            </button>
 
-                                <button 
-                                    onClick={() => {
-                                        const newData = [...data];
-                                        newData.splice(virtualRow.index + 1, 0, {id: Date.now().toString(), item: "Novo", codigo: "", base: "SINAPI", descricao: "", und: "-", quant: 1, valorUnit: 0, total: 0});
-                                        setData(newData);
-                                    }}
-                                    className="flex flex-row items-center justify-center px-2 py-1 hover:bg-zinc-100 dark:bg-zinc-800 rounded text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:text-zinc-100 transition-colors gap-1.5 h-full">
-                                    <Plus className="w-3 h-3" />
-                                    <span className="text-[10px] font-medium whitespace-nowrap">Linha</span>
-                                </button>
-                                
-                                <div className="w-px h-4 bg-zinc-700 mx-0.5"></div>
+                            <button 
+                                onClick={() => {
+                                    const newData = [...data];
+                                    newData.splice(virtualRow.index + 1, 0, {id: Date.now().toString(), item: "Novo", codigo: "", base: "SINAPI", descricao: "", und: "-", quant: 1, valorUnit: 0, total: 0});
+                                    setData(newData);
+                                }}
+                                className="flex flex-row items-center justify-center px-2 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors gap-1.5 h-full">
+                                <Plus className="w-3 h-3" />
+                                <span className="text-[10px] font-medium whitespace-nowrap">Linha</span>
+                            </button>
+                            
+                            <div className="w-px h-4 bg-zinc-200 dark:bg-zinc-700 mx-0.5"></div>
 
-                                <button 
-                                    onClick={() => setData(prev => prev.filter(item => item.id !== row.original.id))}
-                                    className="flex flex-row items-center justify-center px-2 py-1 hover:bg-red-500/10 rounded text-red-400 hover:text-red-300 transition-colors gap-1.5 h-full">
-                                    <Trash2 className="w-3 h-3" />
-                                    <span className="text-[10px] font-medium whitespace-nowrap">Excluir</span>
-                                </button>
-                                </div>
+                            <button 
+                                onClick={() => setData(prev => prev.filter(item => item.id !== row.original.id))}
+                                className="flex flex-row items-center justify-center px-2 py-1 hover:bg-red-50 dark:hover:bg-red-500/10 rounded text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors gap-1.5 h-full">
+                                <Trash2 className="w-3 h-3" />
+                                <span className="text-[10px] font-medium whitespace-nowrap">Excluir</span>
+                            </button>
                             </div>
                         </div>
                         
