@@ -182,7 +182,7 @@ export function BudgetTable({
     bdi?: number 
 }) {
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [memoryModalData, setMemoryModalData] = useState<any[] | null>(null);
+  const [memoryModalData, setMemoryModalData] = useState<{ matches: any[], rowIndex: number } | null>(null);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -263,7 +263,7 @@ export function BudgetTable({
                     </div>
                     {hasMemory && (
                         <button 
-                            onClick={() => setMemoryModalData(info.row.original.top_3_matches!)}
+                            onClick={() => setMemoryModalData({ matches: info.row.original.top_3_matches!, rowIndex: info.row.index })}
                             className="p-1.5 rounded-md text-indigo-400/50 hover:text-indigo-300 hover:bg-indigo-500/10 transition-colors opacity-0 group-hover/desc:opacity-100 flex-shrink-0"
                             title="Ver Memória de Cálculo da IA"
                         >
@@ -301,13 +301,13 @@ export function BudgetTable({
                     <div className={`px-2 py-0.5 rounded-full text-[10px] font-semibold w-max ${color} cursor-help truncate max-w-full`}>
                         {label}
                     </div>
-                    {/* Custom Instant Tooltip (ao lado) */}
+                    {/* Custom Instant Tooltip (ao lado, mais fino e alinhado no topo) */}
                     {just && (
-                        <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 w-64 p-3 bg-[#18181b] border border-zinc-700 rounded-lg shadow-2xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-100 z-[9999] text-xs text-zinc-300 font-normal whitespace-normal leading-relaxed pointer-events-none">
+                        <div className="absolute left-full ml-3 top-0 w-80 p-3 bg-[#18181b] border border-zinc-700 rounded-lg shadow-2xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-100 z-[9999] text-xs text-zinc-300 font-normal whitespace-normal leading-relaxed pointer-events-none">
                             <div className="font-semibold text-zinc-100 mb-1">{label}</div>
                             {just}
-                            {/* Seta do tooltip apontando para a esquerda */}
-                            <div className="absolute top-1/2 -translate-y-1/2 -left-1.5 w-3 h-3 bg-[#18181b] border-l border-t border-zinc-700 -rotate-45"></div>
+                            {/* Seta do tooltip ajustada para o topo */}
+                            <div className="absolute top-2 -left-1.5 w-3 h-3 bg-[#18181b] border-l border-t border-zinc-700 -rotate-45"></div>
                         </div>
                     )}
                 </div>
@@ -532,8 +532,8 @@ export function BudgetTable({
                             A Inteligência Artificial analisou o banco de dados do SINAPI e selecionou as 3 opções matemáticas e semânticas mais prováveis antes de tomar o veredito final:
                         </p>
                         
-                        {memoryModalData.map((match: any, idx: number) => (
-                            <div key={idx} className="bg-[#09090b] border border-zinc-800 rounded-lg p-3 flex flex-col gap-2 relative overflow-hidden">
+                        {memoryModalData.matches.map((match: any, idx: number) => (
+                            <div key={idx} className="bg-[#09090b] border border-zinc-800 rounded-lg p-3 flex flex-col gap-2 relative overflow-hidden group/match hover:border-zinc-600 transition-colors">
                                 {idx === 0 && (
                                     <div className="absolute top-0 right-0 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-bl-lg border-l border-b border-emerald-500/20">
                                         Vencedor
@@ -545,9 +545,30 @@ export function BudgetTable({
                                     <span className="text-xs font-medium text-amber-400 bg-amber-400/10 px-1.5 py-0.5 rounded border border-amber-400/20">{match.unidade}</span>
                                     <span className="text-xs font-medium text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20">Match: {match.score}%</span>
                                 </div>
-                                <p className="text-sm text-zinc-300 leading-relaxed">
-                                    {match.descricao}
-                                </p>
+                                <div className="flex items-start justify-between gap-4">
+                                    <p className="text-sm text-zinc-300 leading-relaxed flex-1">
+                                        {match.descricao}
+                                    </p>
+                                    <button 
+                                        onClick={() => {
+                                            if (window.confirm("Deseja substituir o item atual por esta composição do SINAPI?")) {
+                                                updateRow(memoryModalData.rowIndex, {
+                                                    codigo: match.codigo,
+                                                    descricao: match.descricao,
+                                                    valorUnit: Number(match.custo) || 0,
+                                                    und: match.unidade,
+                                                    ai_status: 'APROVADO_MANUALMENTE',
+                                                    ai_justificativa: 'Composição substituída manualmente pelo usuário via Memória de Cálculo.',
+                                                    base: 'SINAPI'
+                                                });
+                                                setMemoryModalData(null);
+                                            }
+                                        }}
+                                        className="opacity-0 group-hover/match:opacity-100 transition-opacity bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-3 py-1.5 rounded"
+                                    >
+                                        Substituir
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>
