@@ -505,14 +505,14 @@ export function BudgetTable({
                         key={row.id} 
                         ref={rowVirtualizer.measureElement}
                         data-index={virtualRow.index}
-                        className="group hover:bg-zinc-100 dark:bg-zinc-800/30 transition-colors duration-150 absolute top-0 left-0 w-full flex items-center py-2 z-10 hover:z-[90]"
+                        className="group hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition-colors duration-150 absolute top-0 left-0 w-full flex items-center py-2 z-10 hover:z-[90]"
                         style={{
                             minHeight: '52px',
                             transform: `translateY(${virtualRow.start}px)`,
                         }}
                     >
                         {/* Menu de Contexto Invisível */}
-                        <div className="absolute left-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all duration-200 z-[70] scale-95 group-hover:scale-100 flex justify-center items-center pointer-events-none group-hover:pointer-events-auto">
+                        <div className="absolute left-8 top-[60%] pt-2 pb-1 px-1 opacity-0 group-hover:opacity-100 transition-all duration-200 z-[70] scale-95 group-hover:scale-100 flex justify-center items-start pointer-events-none group-hover:pointer-events-auto">
                             <div className="flex flex-row items-center bg-white dark:bg-zinc-800 rounded-md shadow-lg border border-zinc-200 dark:border-zinc-700 p-1 gap-1 h-9">
                             
                             <button 
@@ -577,7 +577,7 @@ export function BudgetTable({
         {/* Modal de Memória de Cálculo (Explainability) */}
         {memoryModalData && (
             <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                <div className="bg-white dark:bg-[#18181b] border border-zinc-300 dark:border-zinc-700 rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+                <div className="bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
                     <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800">
                         <div className="flex items-center gap-2 text-indigo-400">
                             <Brain className="w-5 h-5" />
@@ -597,7 +597,7 @@ export function BudgetTable({
                         </p>
                         
                         {memoryModalData.matches.map((match: any, idx: number) => (
-                            <div key={idx} className="bg-zinc-50 dark:bg-[#09090b] border border-zinc-200 dark:border-zinc-800 rounded-lg p-3 flex flex-col gap-2 relative overflow-hidden group/match hover:border-zinc-600 transition-colors">
+                            <div key={idx} className="bg-white dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-700/50 rounded-lg p-3 flex flex-col gap-2 relative overflow-hidden group/match hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors">
                                 {idx === 0 && (
                                     <div className="absolute top-0 right-0 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-bl-lg border-l border-b border-emerald-500/20">
                                         Vencedor
@@ -640,7 +640,7 @@ export function BudgetTable({
                     <div className="p-4 border-t border-zinc-200 dark:border-zinc-800 flex justify-end">
                         <button 
                             onClick={() => setMemoryModalData(null)}
-                            className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-700 text-sm font-medium text-zinc-900 dark:text-zinc-100 rounded-md transition-colors"
+                            className="px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-sm font-medium text-zinc-900 dark:text-zinc-100 rounded-md transition-colors"
                         >
                             Fechar
                         </button>
