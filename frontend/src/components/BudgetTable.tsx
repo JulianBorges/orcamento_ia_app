@@ -205,8 +205,8 @@ const AutocompleteDescricaoCell = ({ initialValue, rowIndex, onUpdateRow }: any)
             </div>
             
             {isOpen && results.length > 0 && (
-                <div className="absolute left-0 top-full mt-1 w-[600px] z-[999] bg-white dark:bg-[#18181b] border border-zinc-300 dark:border-zinc-700 rounded-lg shadow-2xl overflow-hidden flex flex-col transform origin-top-left transition-all">
-                    <div className="bg-zinc-100 dark:bg-zinc-800/50 px-3 py-1.5 border-b border-zinc-300 dark:border-zinc-700 flex justify-between items-center">
+                <div className="absolute left-0 top-full mt-1 w-[600px] z-[999] bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-2xl overflow-hidden flex flex-col transform origin-top-left transition-all">
+                    <div className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 px-3 py-1.5 flex justify-between items-center">
                         <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 flex items-center gap-1"><Wand2 className="w-3 h-3"/> Sugestões da Inteligência</span>
                         <span className="text-[10px] text-zinc-400 dark:text-zinc-500">{results.length} resultados no SINAPI</span>
                     </div>
@@ -215,7 +215,7 @@ const AutocompleteDescricaoCell = ({ initialValue, rowIndex, onUpdateRow }: any)
                             <div 
                                 key={i}
                                 onClick={() => onSelect(r)}
-                                className="flex flex-col p-3 hover:bg-zinc-100 dark:bg-zinc-800/80 border-b border-zinc-200 dark:border-zinc-800/50 cursor-pointer transition-colors group"
+                                className="flex flex-col p-3 hover:bg-zinc-50 dark:hover:bg-zinc-800 border-b border-zinc-100 dark:border-zinc-800/50 cursor-pointer transition-colors group"
                             >
                                 <div className="flex items-center justify-between mb-1">
                                     <div className="flex items-center gap-2">
@@ -368,11 +368,11 @@ export function BudgetTable({
                     </div>
                     {/* Custom Instant Tooltip (ao lado, mais fino e alinhado no topo) */}
                     {just && (
-                        <div className="absolute left-full ml-3 top-0 w-80 p-3 bg-white dark:bg-[#18181b] border border-zinc-300 dark:border-zinc-700 rounded-lg shadow-2xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-100 z-[9999] text-xs text-zinc-700 dark:text-zinc-300 font-normal whitespace-normal leading-relaxed pointer-events-none">
+                        <div className="absolute left-full ml-3 top-0 w-80 p-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-2xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-100 z-[9999] text-xs text-zinc-700 dark:text-zinc-300 font-normal whitespace-normal leading-relaxed pointer-events-none">
                             <div className="font-semibold text-zinc-900 dark:text-zinc-100 mb-1">{label}</div>
                             {just}
                             {/* Seta do tooltip ajustada para o topo */}
-                            <div className="absolute top-2 -left-1.5 w-3 h-3 bg-white dark:bg-[#18181b] border-l border-t border-zinc-300 dark:border-zinc-700 -rotate-45"></div>
+                            <div className="absolute top-2 -left-1.5 w-3 h-3 bg-white dark:bg-zinc-900 border-l border-t border-zinc-200 dark:border-zinc-800 -rotate-45"></div>
                         </div>
                     )}
                 </div>
@@ -577,7 +577,7 @@ export function BudgetTable({
         {/* Modal de Memória de Cálculo (Explainability) */}
         {memoryModalData && (
             <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-                <div className="bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
                     <div className="flex items-center justify-between p-4 border-b border-zinc-200 dark:border-zinc-800">
                         <div className="flex items-center gap-2 text-indigo-400">
                             <Brain className="w-5 h-5" />

@@ -86,10 +86,10 @@ export function CompositionCreatorModal({ isOpen, initialQuery = '', onClose, on
 
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-            <div className="bg-zinc-50 dark:bg-[#09090b] border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
                 
                 {/* Header */}
-                <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-white dark:bg-zinc-900/50">
+                <div className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between bg-white dark:bg-zinc-900">
                     <div className="flex items-center gap-3">
                         <div className="p-2 bg-indigo-500/20 rounded-lg">
                             <Sparkles className="w-5 h-5 text-indigo-400" />
@@ -99,7 +99,7 @@ export function CompositionCreatorModal({ isOpen, initialQuery = '', onClose, on
                             <p className="text-xs text-zinc-400 dark:text-zinc-500 dark:text-zinc-400">Multi-Agentes de Engenharia (IA)</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-zinc-100 dark:bg-zinc-800 rounded-md text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 transition-colors">
+                    <button onClick={onClose} className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md text-zinc-500 dark:text-zinc-400 transition-colors">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
@@ -116,7 +116,7 @@ export function CompositionCreatorModal({ isOpen, initialQuery = '', onClose, on
                                 value={query}
                                 onChange={(e) => setQuery(e.target.value)}
                                 placeholder="Ex: Piso de porcelanato 90x90 com argamassa ACIII dupla colagem"
-                                className="flex-1 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-4 py-2.5 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder:text-zinc-600"
+                                className="flex-1 bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700/50 rounded-lg px-4 py-2.5 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all placeholder:text-zinc-500"
                                 onKeyDown={(e) => e.key === 'Enter' && !isLoading && handleGenerate()}
                             />
                             <button 
@@ -141,8 +141,8 @@ export function CompositionCreatorModal({ isOpen, initialQuery = '', onClose, on
                     {/* Result Area */}
                     {result && (
                         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                            <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg overflow-hidden">
-                                <div className="p-4 bg-zinc-100 dark:bg-zinc-800/30 border-b border-zinc-200 dark:border-zinc-800 flex justify-between items-center">
+                            <div className="bg-white dark:bg-zinc-800/30 border border-zinc-200 dark:border-zinc-700/50 rounded-lg overflow-hidden">
+                                <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 border-b border-zinc-200 dark:border-zinc-700/50 flex justify-between items-center">
                                     <div>
                                         <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 text-lg leading-tight">{result.servico}</h3>
                                         <p className="text-xs text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mt-1 font-mono">Unidade: {result.unidade_medida}</p>
@@ -155,7 +155,7 @@ export function CompositionCreatorModal({ isOpen, initialQuery = '', onClose, on
                                 
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-sm text-left">
-                                        <thead className="text-xs text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 uppercase bg-white dark:bg-zinc-900/80 border-b border-zinc-200 dark:border-zinc-800">
+                                        <thead className="text-xs text-zinc-500 dark:text-zinc-400 uppercase bg-zinc-50 dark:bg-zinc-800/80 border-b border-zinc-200 dark:border-zinc-700/50">
                                             <tr>
                                                 <th className="px-4 py-3 font-medium">Tipo</th>
                                                 <th className="px-4 py-3 font-medium">Código</th>
@@ -166,9 +166,9 @@ export function CompositionCreatorModal({ isOpen, initialQuery = '', onClose, on
                                                 <th className="px-4 py-3 font-medium text-right">R$ Total</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-zinc-800/50">
+                                        <tbody className="divide-y divide-zinc-200 dark:divide-zinc-700/50">
                                             {result.itens.map((item, idx) => (
-                                                <tr key={idx} className="hover:bg-zinc-100 dark:bg-zinc-800/30 transition-colors">
+                                                <tr key={idx} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
                                                     <td className="px-4 py-3">
                                                         <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${
                                                             item.tipo.includes('Mão de Obra') ? 'bg-amber-500/10 text-amber-400' :
@@ -207,10 +207,10 @@ export function CompositionCreatorModal({ isOpen, initialQuery = '', onClose, on
                 </div>
 
                 {/* Footer Actions */}
-                <div className="px-6 py-4 border-t border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 flex justify-end gap-3">
+                <div className="px-6 py-4 border-t border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900 flex justify-end gap-3">
                     <button 
                         onClick={onClose}
-                        className="px-5 py-2 text-sm font-medium text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-200 transition-colors"
+                        className="px-4 py-2 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-lg transition-colors"
                     >
                         Fechar
                     </button>
