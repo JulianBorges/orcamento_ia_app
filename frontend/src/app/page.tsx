@@ -379,7 +379,7 @@ export default function Home() {
                   <button 
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isProcessing}
-                    className="flex items-center gap-2 px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-700 text-sm font-medium rounded-md transition-colors disabled:opacity-50 shadow-lg"
+                    className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-sm font-medium rounded-md transition-colors disabled:opacity-50 shadow-sm"
                   >
                     <UploadCloud className="w-4 h-4" /> Importar Excel
                   </button>
@@ -408,7 +408,7 @@ export default function Home() {
                     <button 
                         onClick={() => fileInputRef.current?.click()}
                         disabled={isProcessing}
-                        className="flex items-center gap-2 px-4 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-sm font-medium rounded-md transition-colors disabled:opacity-50"
+                        className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-sm font-medium rounded-md transition-colors disabled:opacity-50 shadow-sm"
                     >
                         <Plus className="w-4 h-4" /> Carregar Mais Itens
                     </button>
