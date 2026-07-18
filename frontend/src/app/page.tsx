@@ -40,7 +40,7 @@ export default function Home() {
                   oldItem.id === nextUpdate.id ? nextUpdate : oldItem
               ));
           }
-      }, 1000);
+      }, 100);
       return () => clearInterval(interval);
   }, []);
 
@@ -157,6 +157,7 @@ export default function Home() {
              codigo: '-',
              base: '-',
              descricao: r.descricao,
+             descricao_legada: r.descricao,
              und: r.unidade || '-',
              quant: r.quantidade,
              valorUnit: r.valorUnit || 0.0,
@@ -221,12 +222,13 @@ export default function Home() {
                                 codigo: isApproved ? (meta.codigo || '-') : '-',
                                 base: isApproved ? "SINAPI" : "-",
                                 descricao: isApproved ? (meta.descricao || oldItem.descricao) : oldItem.descricao,
+                                descricao_legada: oldItem.descricao_legada || oldItem.descricao,
                                 und: isApproved ? (meta.unidade || '-') : '-',
                                 valorUnit: isApproved ? (meta.custo || 0.0) : 0.0,
                                 total: (isApproved ? (meta.custo || 0.0) : 0.0) * oldItem.quant,
                                 ai_status: aiStatus,
                                 ai_justificativa: analise.justificativa || resData.justificativa || aiError || 'Falha ao processar',
-                                top_3_matches: resData.top_3_matches || []
+                                memoria_calculo: resData.memoria_calculo || []
                             };
                             
                             updatedItemsMap.set(newItem.id, newItem);

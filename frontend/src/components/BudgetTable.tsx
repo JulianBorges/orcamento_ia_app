@@ -25,7 +25,8 @@ export type BudgetItem = {
   total: number;
   ai_status?: string;
   ai_justificativa?: string;
-  top_3_matches?: any[];
+  memoria_calculo?: any[];
+  descricao_legada?: string;
 };
 
 const columnHelper = createColumnHelper<BudgetItem>();
@@ -266,7 +267,7 @@ export function BudgetTable({
     onOpenCreatorModal?: (query: string, rowIndex?: number) => void
 }) {
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [memoryModalData, setMemoryModalData] = useState<{ matches: any[], rowIndex: number } | null>(null);
+  const [memoryModalData, setMemoryModalData] = useState<{ matches: any[], rowIndex: number, legado: string } | null>(null);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -335,7 +336,7 @@ export function BudgetTable({
         header: "Descrição do Serviço",
         size: 600,
         cell: info => {
-            const hasMemory = info.row.original.top_3_matches && info.row.original.top_3_matches.length > 0;
+            const hasMemory = info.row.original.memoria_calculo && info.row.original.memoria_calculo.length > 0;
             return (
                 <div className="flex items-center gap-2 w-full h-full group/desc">
                     <div className="flex-1">
@@ -347,7 +348,7 @@ export function BudgetTable({
                     </div>
                     {hasMemory && (
                         <button 
-                            onClick={() => setMemoryModalData({ matches: info.row.original.top_3_matches!, rowIndex: info.row.index })}
+                            onClick={() => setMemoryModalData({ matches: info.row.original.memoria_calculo!, rowIndex: info.row.index, legado: info.row.original.descricao_legada || info.row.original.descricao })}
                             className="p-1.5 rounded-md text-indigo-400/50 hover:text-indigo-300 hover:bg-indigo-500/10 transition-colors opacity-0 group-hover/desc:opacity-100 flex-shrink-0"
                             title="Ver Memória de Cálculo da IA"
                         >
@@ -611,12 +612,17 @@ export function BudgetTable({
                     </div>
                     
                     <div className="p-4 overflow-y-auto custom-scrollbar flex flex-col gap-3">
-                        <p className="text-sm text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 mb-2">
-                            A Inteligência Artificial analisou o banco de dados do SINAPI e selecionou as 3 opções matemáticas e semânticas mais prováveis antes de tomar o veredito final:
-                        </p>
+                        <div className="bg-indigo-500/5 dark:bg-indigo-500/10 border border-indigo-500/20 rounded-lg p-4 mb-2 flex flex-col gap-2 shrink-0">
+                            <p className="text-sm text-zinc-700 dark:text-zinc-300">
+                                A IA analisou o banco de dados do SINAPI e selecionou as {memoryModalData.matches.length} opções mais prováveis antes de tomar a decisão final para o item:
+                            </p>
+                            <p className="text-sm font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 px-3 py-2 rounded-md border border-indigo-500/20 break-words whitespace-normal">
+                                {memoryModalData.legado}
+                            </p>
+                        </div>
                         
                         {memoryModalData.matches.map((match: any, idx: number) => (
-                            <div key={idx} className="bg-white dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-700/50 rounded-lg p-3 flex flex-col gap-2 relative overflow-hidden group/match hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors">
+                            <div key={idx} className="bg-white dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-700/50 rounded-lg p-4 flex flex-col gap-3 relative overflow-hidden group/match hover:border-zinc-300 dark:hover:border-zinc-600 transition-colors shrink-0">
                                 {idx === 0 && (
                                     <div className="absolute top-0 right-0 bg-emerald-500/20 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-bl-lg border-l border-b border-emerald-500/20">
                                         Vencedor
@@ -629,7 +635,7 @@ export function BudgetTable({
                                     <span className="text-xs font-medium text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded border border-indigo-500/20">Match: {match.score}%</span>
                                 </div>
                                 <div className="flex items-start justify-between gap-4">
-                                    <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed flex-1">
+                                    <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed flex-1 break-words whitespace-normal">
                                         {match.descricao}
                                     </p>
                                     <button 
@@ -647,7 +653,7 @@ export function BudgetTable({
                                                 setMemoryModalData(null);
                                             }
                                         }}
-                                        className="opacity-0 group-hover/match:opacity-100 transition-opacity bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-3 py-1.5 rounded"
+                                        className="opacity-0 group-hover/match:opacity-100 transition-opacity bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium px-3 py-1.5 rounded shrink-0"
                                     >
                                         Substituir
                                     </button>

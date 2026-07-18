@@ -49,7 +49,7 @@ async def processar_real_ai(item: StatelessBatchItem, vector: list = None):
         return {"id": item.id, "status": "TITULO_VAZIO", "quantidade_original": quantidade, "descricao_original": descricao}
         
     try:
-        matches = await buscar_verdadeiro_hibrido_async(descricao, top_k=5, vector=vector)
+        matches = await buscar_verdadeiro_hibrido_async(descricao, top_k=7, vector=vector)
         if not matches or matches[0]['score'] < 0.3:
             return {"id": item.id, "status": "REJEITADO_FILTRO_MATEMATICO", "justificativa": "Sem similaridade na base.", "quantidade_original": quantidade, "descricao_original": descricao}
             
@@ -63,10 +63,10 @@ async def processar_real_ai(item: StatelessBatchItem, vector: list = None):
         if 'codigo' in meta and isinstance(meta['codigo'], str):
             meta['codigo'] = meta['codigo'].replace('comp_', '')
             
-        top_3_matches = []
-        for m in matches[:3]:
+        memoria_calculo = []
+        for m in matches:
             m_meta = m.get('metadata', {})
-            top_3_matches.append({
+            memoria_calculo.append({
                 "codigo": str(m_meta.get("codigo", "")).replace('comp_', ''),
                 "descricao": m_meta.get("descricao", ""),
                 "unidade": m_meta.get("unidade", ""),
@@ -80,7 +80,7 @@ async def processar_real_ai(item: StatelessBatchItem, vector: list = None):
             "quantidade_original": quantidade,
             "analise": analise.dict(),
             "metadados": meta,
-            "top_3_matches": top_3_matches,
+            "memoria_calculo": memoria_calculo,
             "status": "SUCESSO"
         }
     except Exception as e:
