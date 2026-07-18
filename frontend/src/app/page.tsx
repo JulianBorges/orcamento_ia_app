@@ -5,6 +5,15 @@ import { BudgetTable, BudgetItem } from "@/components/BudgetTable";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { CompositionCreatorModal, ComposicaoGerada } from "@/components/CompositionCreatorModal";
 import * as XLSX from "xlsx";
+import { z } from "zod";
+
+const excelRowSchema = z.object({
+  descricao: z.string().min(1, "Descrição vazia").default("Item sem descrição"),
+  quantidade: z.number().default(1.0),
+  unidade: z.string().default("-"),
+  valorUnit: z.number().default(0.0),
+});
+
 
 export default function Home() {
   const [isLoaded, setIsLoaded] = useState(false);
@@ -120,12 +129,23 @@ export default function Home() {
                 descricao = row[Object.keys(row)[0]] || "";
             }
             
+            const parsed = excelRowSchema.safeParse({
+                descricao: String(descricao),
+                quantidade: isNaN(quantidade) ? 1.0 : quantidade,
+                unidade: String(unidade),
+                valorUnit: isNaN(valorUnit) ? 0.0 : valorUnit
+            });
+            
+            const validData = parsed.success ? parsed.data : {
+                descricao: "Item inválido detectado pelo Zod",
+                quantidade: 1.0,
+                unidade: "-",
+                valorUnit: 0.0
+            };
+            
             return {
                 id: `r_${Date.now()}_${index}`,
-                descricao: String(descricao),
-                quantidade,
-                unidade,
-                valorUnit
+                ...validData
             };
         });
 
@@ -171,7 +191,10 @@ export default function Home() {
                 try {
                     const res = await fetch(`/api/orcamento/processar-lote-stateless`, {
                         method: "POST",
-                        headers: { "Content-Type": "application/json" },
+                        headers: { 
+                            "Content-Type": "application/json",
+                            "x-api-key": process.env.NEXT_PUBLIC_API_KEY || "chave-secreta-padrao"
+                        },
                         body: JSON.stringify({ itens: chunk }),
                     });
                     

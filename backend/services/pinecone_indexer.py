@@ -1,5 +1,5 @@
 import os
-import pandas as pd
+import polars as pl
 from dotenv import load_dotenv
 from openai import OpenAI
 from pinecone import Pinecone, ServerlessSpec
@@ -36,7 +36,7 @@ def processar_planilha_sinapi(nome_arquivo):
     caminho_arquivo = os.path.join(BASE_SINAPI_PATH, nome_arquivo)
     
     # Pula as 8 linhas de cabeçalho da Caixa Econômica Federal
-    df = pd.read_excel(caminho_arquivo, skiprows=9)
+    df = pl.read_excel(caminho_arquivo, engine="calamine", read_options={"skip_rows": 9})
 
     # Busca dinâmica pelas colunas
     col_cod = next((c for c in df.columns if 'código' in str(c).lower() or 'codigo' in str(c).lower()), df.columns[0])
@@ -44,29 +44,31 @@ def processar_planilha_sinapi(nome_arquivo):
     col_preco = next((c for c in df.columns if 'custo' in str(c).lower() or 'preço' in str(c).lower()), df.columns[2])
     col_und = next((c for c in df.columns if 'unidad' in str(c).lower() or 'und' in str(c).lower()), df.columns[3])
 
-    df = df.rename(columns={col_cod: "Codigo", col_desc: "Descricao", col_preco: "Preco", col_und: "Unidade"})
+    df = df.rename({col_cod: "Codigo", col_desc: "Descricao", col_preco: "Preco", col_und: "Unidade"})
 
     # Limpeza de dados
-    df = df.dropna(subset=["Codigo", "Descricao"])
-    df["Codigo"] = df["Codigo"].astype(str).str.strip()
-    df["Descricao"] = df["Descricao"].astype(str).str.strip()
-    df["Preco"] = pd.to_numeric(df["Preco"], errors='coerce').fillna(0.0)
-    df["Unidade"] = df["Unidade"].astype(str).fillna("-").str.strip()
+    df = df.drop_nulls(subset=["Codigo", "Descricao"])
+    df = df.with_columns([
+        pl.col("Codigo").cast(pl.String).str.strip_chars(),
+        pl.col("Descricao").cast(pl.String).str.strip_chars(),
+        pl.col("Unidade").cast(pl.String).fill_null("-").str.strip_chars(),
+        pl.col("Preco").cast(pl.Float64, strict=False).fill_null(0.0)
+    ])
     
-    df = df[(df["Codigo"] != "") & (df["Descricao"] != "")]
-    df = df.drop_duplicates(subset=["Codigo"], keep='first')
+    df = df.filter((pl.col("Codigo") != "") & (pl.col("Descricao") != ""))
+    df = df.unique(subset=["Codigo"], keep='first')
 
-    total_itens = len(df)
+    total_itens = df.height
     batch_size = 100 # Reduzido para Pinecone para não exceder limites de requisição
     itens_indexados = 0
 
     for i in tqdm(range(0, total_itens, batch_size), desc="Vetorizando itens e enviando ao Pinecone"):
-        batch_df = df.iloc[i : i + batch_size]
+        batch_df = df.slice(i, batch_size)
         
-        ids = batch_df["Codigo"].tolist()
-        documents = batch_df["Descricao"].tolist()
-        precos = batch_df["Preco"].tolist()
-        unidades = batch_df["Unidade"].tolist()
+        ids = batch_df["Codigo"].to_list()
+        documents = batch_df["Descricao"].to_list()
+        precos = batch_df["Preco"].to_list()
+        unidades = batch_df["Unidade"].to_list()
         
         # Gera Embeddings
         resposta = openai_client.embeddings.create(

@@ -31,7 +31,15 @@ export type BudgetItem = {
 const columnHelper = createColumnHelper<BudgetItem>();
 
 // Componente isolado para evitar perda de foco e lag durante a digitação
-const CellInput = ({ initialValue, onUpdate, type = "text", className = "", step }: any) => {
+export interface CellInputProps {
+    initialValue: string | number;
+    onUpdate: (val: string | number) => void;
+    type?: string;
+    className?: string;
+    step?: string;
+}
+
+const CellInput = ({ initialValue, onUpdate, type = "text", className = "", step }: CellInputProps) => {
     const [val, setVal] = useState(initialValue);
     
     // Atualiza o estado local se o valor pai mudar (ex: IA injeta novos dados)
@@ -45,7 +53,7 @@ const CellInput = ({ initialValue, onUpdate, type = "text", className = "", step
             step={step}
             value={val}
             onChange={e => setVal(e.target.value)}
-            onBlur={() => onUpdate(type === 'number' ? (parseFloat(val) || 0) : val)}
+            onBlur={() => onUpdate(type === 'number' ? (parseFloat(String(val)) || 0) : val)}
             onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === 'Escape') {
                     e.currentTarget.blur();
@@ -56,7 +64,12 @@ const CellInput = ({ initialValue, onUpdate, type = "text", className = "", step
     );
 };
 
-const CodigoCell = ({ initialValue, onUpdate }: any) => {
+export interface CodigoCellProps {
+    initialValue: string;
+    onUpdate: (val: string) => void;
+}
+
+const CodigoCell = ({ initialValue, onUpdate }: CodigoCellProps) => {
     const [isEditing, setIsEditing] = useState(false);
     const [val, setVal] = useState(initialValue);
 
@@ -99,7 +112,13 @@ const CodigoCell = ({ initialValue, onUpdate }: any) => {
 };
 
 // Componente inteligente que faz a ponte visual com o banco de dados vetorial
-const AutocompleteDescricaoCell = ({ initialValue, rowIndex, onUpdateRow }: any) => {
+export interface AutocompleteDescricaoCellProps {
+    initialValue: string;
+    rowIndex: number;
+    onUpdateRow: (row: Partial<BudgetItem>) => void;
+}
+
+const AutocompleteDescricaoCell = ({ initialValue, rowIndex, onUpdateRow }: AutocompleteDescricaoCellProps) => {
     const [val, setVal] = useState(initialValue);
     const [results, setResults] = useState<any[]>([]);
     const [isOpen, setIsOpen] = useState(false);

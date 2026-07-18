@@ -6,6 +6,8 @@ from openai import AsyncOpenAI
 from pinecone import Pinecone
 from models.schemas import AnaliseItem
 from dotenv import load_dotenv
+from pathlib import Path
+from cachetools import TTLCache
 
 load_dotenv()
 async_openai_client = AsyncOpenAI()
@@ -14,47 +16,32 @@ pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 # Conexão Global Read-Only para otimizar Lotes na Vercel
 GLOBAL_SQLITE_CONN = None
 
+# Cache Semântico em Memória: Armazena até 1000 buscas recentes por 1 hora
+semantic_cache = TTLCache(maxsize=1000, ttl=3600)
+
 def get_sqlite_conn():
     global GLOBAL_SQLITE_CONN
     if GLOBAL_SQLITE_CONN is None:
+        db_path = Path(__file__).parent.parent / "sinapi.db"
         try:
             # check_same_thread=False é seguro apenas para leitura
-            GLOBAL_SQLITE_CONN = sqlite3.connect("sinapi.db", check_same_thread=False)
+            GLOBAL_SQLITE_CONN = sqlite3.connect(str(db_path), check_same_thread=False)
         except Exception:
-            return sqlite3.connect("sinapi.db")
+            return sqlite3.connect(str(db_path))
     return GLOBAL_SQLITE_CONN
 
-# O índice só é instanciado se a chave existir para evitar erros de inicialização.
+# O índice deve existir. Falhamos rápido (Fail-Fast) se houver erro para não mascarar problemas.
 try:
     index = pc.Index("orcamento-engenharia")
-except Exception:
-    index = None
+except Exception as e:
+    raise RuntimeError(f"Erro Crítico: Falha ao conectar no Pinecone. Detalhes: {str(e)}")
 
-SYSTEM_PROMPT = """Você é um Engenheiro Sênior Multidisciplinar (Engenharia Civil, Mecânica, Arquitetura e Urbanismo, com foco em Estruturas, Geotecnia, Instalações Hidrossanitárias/Elétricas, PPCI, Climatização, Elevadores e Outros). 
-Sua tarefa é mapear descrições de orçamentos legados para a base oficial do SINAPI, utilizando as seguintes Regras Críticas de Aprovação:
+def load_prompt(filename):
+    prompt_path = Path(__file__).parent.parent / "prompts" / filename
+    with open(prompt_path, "r", encoding="utf-8") as f:
+        return f.read()
 
-REGRA 1: TOLERÂNCIA DE ESCOPO (Macro vs. Micro)
-Avalie a ordem de grandeza e a etapa da obra. É ESTRITAMENTE PROIBIDO associar um serviço global/sistêmico (ex: 'Instalação provisória', 'Mobilização', 'Rede de água', 'Canteiro') a uma peça micro/unitária ou conexão (ex: 'um Tê', 'uma bucha', 'um cabo', 'um disjuntor'). Incompatibilidade de escala e esforço exige REJEIÇÃO imediata.
-
-REGRA 2: TOLERÂNCIA FÍSICA E DIMENSIONAL (Limite de 15%)
-Se a descrição legada exigir uma dimensão específica (mm, cm, m, kg, etc.), compare com as dimensões das opções do SINAPI. 
-Calcule a diferença percentual de forma estrita. Se a variação da grandeza for SUPERIOR a 15%, REJEITE a opção por incompatibilidade física. 
-Se a variação for de até 15%, a opção é aceitável como premissa, mas você DEVE exibir o cálculo percentual na sua justificativa.
-
-REGRA 3: ESCOPO GENÉRICO VS ESPECÍFICO (Regra da Aplicação Padrão)
-Se a descrição legada for genérica (ex: "Tubo PVC 25mm", "Regularização de subleito") e as opções do SINAPI exigirem uma especificidade (ex: uso em ramal de água, dreno, solo argiloso, arenoso), você DEVE selecionar a opção de uso MAIS COMUM e padrão na engenharia civil (ex: água fria/ramal para tubos convencionais, solo misto/predominante para terraplenagem). 
-NUNCA selecione usos de nicho (ex: dreno de ar-condicionado) se o legado for genérico.
-
-REGRA 4: ESTRUTURA E CLASSIFICAÇÃO DA RESPOSTA (OBRIGATÓRIO JSON)
-- Se houver correspondência exata ou equivalência plena: status = "ACEITO" e justifique.
-- Se houver diferença aceitável (tolerância de 20%) ou se você assumiu o uso mais comum para um legado genérico (Regra 3): status = "ACEITO COM RESSALVA" e justifique a escolha do uso padrão.
-- Se quebrar as regras de Escopo Macro vs Micro (Regra 1) ou de Dimensão física >20% (Regra 2): status = "REJEITADO" e explique a violação.
-
-REGRA 5: COMPATIBILIDADE DE UNIDADE (CUSTO E PRECIFICAÇÃO)
-O orçamento tem um preço e uma unidade original. Você DEVE verificar se a unidade do SINAPI é logicamente compatível com a do legado (ex: 'm' com 'm', 'm3' com 'm3', 'un' com 'un'). Se a unidade original for completamente incompatível com a do SINAPI (ex: legado em 'm3' e SINAPI em 'kg', ou legado em 'm' e SINAPI em 'un') de forma que multiplique o custo de forma completamente errônea, você DEVE REJEITAR o item, ou marcá-lo como ACEITO COM RESSALVA se houver uma conversão óbvia documentada no raciocínio.
-
-ATENÇÃO: Utilize o campo `raciocinio_passo_a_passo` ANTES de dar o veredito para comparar matematicamente a dimensão e a unidade.
-"""
+SYSTEM_PROMPT = load_prompt("mapeamento.md")
 
 def lexical_reranker(query: str, semantic_matches: list) -> list:
     """
@@ -177,6 +164,12 @@ async def buscar_sqlite_async(query: str, top_k: int = 15):
 
 async def buscar_verdadeiro_hibrido_async(descricao: str, top_k: int = 15, vector: list = None):
     """Busca no Pinecone (Semântico) + SQLite (Lexical) e passa pelo Reranker."""
+    
+    # Verifica cache (apenas se vector for None, que é o caso comum sem batching)
+    cache_key = f"hibrido_{descricao}_{top_k}"
+    if vector is None and cache_key in semantic_cache:
+        return semantic_cache[cache_key]
+        
     # Dispara as duas buscas em paralelo
     task_pinecone = buscar_semelhantes_pinecone_async(descricao, top_k=50, vector=vector) # Traz 100 por baixo dos panos
     task_sqlite = buscar_sqlite_async(descricao, top_k=20)
@@ -201,7 +194,12 @@ async def buscar_verdadeiro_hibrido_async(descricao: str, top_k: int = 15, vecto
     # Aplica o Reranker para dar a nota final misturando Semântica e Lexical
     hybrid_matches = lexical_reranker(descricao, matches_combinados)
     
-    return hybrid_matches[:top_k]
+    final_result = hybrid_matches[:top_k]
+    
+    if vector is None:
+        semantic_cache[cache_key] = final_result
+        
+    return final_result
 
 
 
@@ -255,6 +253,10 @@ async def fluxo_multi_agentes_mapeamento_async(item_legado, opcoes_pinecone: lis
 
 async def agente_pesquisador_composicoes(descricao: str, top_k: int = 5):
     """Agente 1: Busca no Pinecone por Composições SINAPI similares para usar como referência."""
+    cache_key = f"comps_{descricao}_{top_k}"
+    if cache_key in semantic_cache:
+        return semantic_cache[cache_key]
+        
     res = await async_openai_client.embeddings.create(model="text-embedding-3-small", input=descricao)
     vector = res.data[0].embedding
     
@@ -264,22 +266,12 @@ async def agente_pesquisador_composicoes(descricao: str, top_k: int = 5):
         None, 
         lambda: index_v2.query(vector=vector, top_k=top_k, include_metadata=True, namespace="composicoes_sinapi")
     )
+    
+    semantic_cache[cache_key] = query_response['matches']
     return query_response['matches']
 
-SYSTEM_PROMPT_ENGENHEIRO = """Você é um Engenheiro de Custos (Agente Criador).
-Missão: Criar uma Composição de Preço Unitário (CPU) INÉDITA baseando-se em composições de referência reais do SINAPI.
-REGRAS:
-1. Estude as referências do SINAPI fornecidas para entender os coeficientes normais de mão de obra (ex: horas de pedreiro por m2).
-2. Se o serviço pedido tiver um material diferente, troque-o, mas mantenha a coerência da produtividade.
-3. Não invente coeficientes do nada; extrapole e interpole das referências.
-4. Gere a tabela. Não se preocupe com erros de arredondamento, o Agente Revisor irá conferir."""
-
-SYSTEM_PROMPT_REVISOR = """Você é um Auditor de Custos Sênior (Agente Revisor).
-Missão: Revisar o JSON de uma CPU gerada por um Engenheiro Júnior.
-REGRAS:
-1. Matemática perfeita: Para cada item, `valor_total` DEVE SER EXATAMENTE `coeficiente * valor_unitario`. Corrija se necessário.
-2. Soma total: `valor_total_composicao` DEVE SER EXATAMENTE o somatório dos `valor_total` de todos os itens.
-3. Responda APENAS o JSON validado, preenchendo a `justificativa` com a explicação das suas auditorias."""
+SYSTEM_PROMPT_ENGENHEIRO = load_prompt("engenheiro.md")
+SYSTEM_PROMPT_REVISOR = load_prompt("revisor.md")
 
 async def gerar_composicao_agentes_async(servico: str) -> dict:
     from models.schemas import ComposicaoGerada
