@@ -31,7 +31,7 @@ export default function Home() {
                   oldItem.id === nextUpdate.id ? nextUpdate : oldItem
               ));
           }
-      }, 500);
+      }, 1000);
       return () => clearInterval(interval);
   }, []);
 
@@ -226,8 +226,8 @@ export default function Home() {
                         });
                         setTableData([...currentTableData]);
                     } else {
-                        // Espera 3 segundos antes do retry
-                        await new Promise(resolve => setTimeout(resolve, 3000));
+                        // Espera exponencial antes do retry para desafogar o servidor (3s, 6s)
+                        await new Promise(resolve => setTimeout(resolve, (4 - retries) * 3000));
                     }
                 }
             }
@@ -408,7 +408,7 @@ export default function Home() {
                     <button 
                         onClick={() => fileInputRef.current?.click()}
                         disabled={isProcessing}
-                        className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-zinc-800 hover:bg-zinc-  dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 text-sm font-medium rounded-md transition-colors disabled:opacity-50 shadow-sm"
+                        className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-zinc-800 hover:bg-zinc-  dark:hover:bg-zinc-800  text-zinc-700 dark:text-zinc-300 text-sm font-medium rounded-md transition-colors disabled:opacity-50 shadow-sm"
                     >
                         <Plus className="w-4 h-4" /> Carregar Mais Itens
                     </button>
@@ -434,7 +434,7 @@ export default function Home() {
         {/* Modal de Confirmação de Upload */}
         {showUploadDialog && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-                <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 p-6 rounded-xl shadow-2xl max-w-md w-full">
+                <div className="bg-white dark:bg-[#18181b] border border-zinc-300 dark:border-zinc-700 p-6 rounded-xl shadow-2xl max-w-md w-full">
                     <div className="flex items-center gap-3 text-zinc-900 dark:text-zinc-100 mb-4">
                         <AlertCircle className="w-6 h-6 text-indigo-400" />
                         <h2 className="text-xl font-semibold">Planilha Detectada</h2>
@@ -445,7 +445,7 @@ export default function Home() {
                     <div className="flex items-center gap-3 justify-end">
                         <button 
                             onClick={() => setShowUploadDialog(false)}
-                            className="px-4 py-2 text-sm font-medium text-zinc-500 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors"
+                            className="px-4 py-2 text-sm font-medium text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:text-zinc-200 transition-colors"
                         >
                             Cancelar
                         </button>

@@ -11,6 +11,19 @@ load_dotenv()
 async_openai_client = AsyncOpenAI()
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 
+# Conexão Global Read-Only para otimizar Lotes na Vercel
+GLOBAL_SQLITE_CONN = None
+
+def get_sqlite_conn():
+    global GLOBAL_SQLITE_CONN
+    if GLOBAL_SQLITE_CONN is None:
+        try:
+            # check_same_thread=False é seguro apenas para leitura
+            GLOBAL_SQLITE_CONN = sqlite3.connect("sinapi.db", check_same_thread=False)
+        except Exception:
+            return sqlite3.connect("sinapi.db")
+    return GLOBAL_SQLITE_CONN
+
 # O índice só é instanciado se a chave existir para evitar erros de inicialização.
 try:
     index = pc.Index("orcamento-engenharia")
@@ -100,10 +113,11 @@ def lexical_reranker(query: str, semantic_matches: list) -> list:
         
     return reranked
 
-async def buscar_semelhantes_pinecone_async(descricao: str, top_k: int = 15):
+async def buscar_semelhantes_pinecone_async(descricao: str, top_k: int = 15, vector: list = None):
     """Busca assíncrona no Pinecone (via embeddings da OpenAI) com Reranker Lexical."""
-    res = await async_openai_client.embeddings.create(model="text-embedding-3-small", input=descricao)
-    vector = res.data[0].embedding
+    if vector is None:
+        res = await async_openai_client.embeddings.create(model="text-embedding-3-small", input=descricao)
+        vector = res.data[0].embedding
     
     # Busca Ampla Semântica: Traz 100 itens em vez de 15, para não perder nenhum cano.
     loop = asyncio.get_event_loop()
@@ -129,7 +143,7 @@ def buscar_sqlite_sync(query: str, top_k: int = 15):
     
     fts_query = " ".join([f"{t}*" for t in tokens])
     
-    conn = sqlite3.connect("sinapi.db")
+    conn = get_sqlite_conn()
     cursor = conn.cursor()
     try:
         cursor.execute('''
@@ -156,17 +170,15 @@ def buscar_sqlite_sync(query: str, top_k: int = 15):
     except Exception as e:
         print("Erro SQLite FTS:", e)
         return []
-    finally:
-        conn.close()
 
 async def buscar_sqlite_async(query: str, top_k: int = 15):
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(None, lambda: buscar_sqlite_sync(query, top_k))
 
-async def buscar_verdadeiro_hibrido_async(descricao: str, top_k: int = 15):
+async def buscar_verdadeiro_hibrido_async(descricao: str, top_k: int = 15, vector: list = None):
     """Busca no Pinecone (Semântico) + SQLite (Lexical) e passa pelo Reranker."""
     # Dispara as duas buscas em paralelo
-    task_pinecone = buscar_semelhantes_pinecone_async(descricao, top_k=50) # Traz 100 por baixo dos panos
+    task_pinecone = buscar_semelhantes_pinecone_async(descricao, top_k=50, vector=vector) # Traz 100 por baixo dos panos
     task_sqlite = buscar_sqlite_async(descricao, top_k=20)
     
     res_pinecone, res_sqlite = await asyncio.gather(task_pinecone, task_sqlite)
@@ -278,7 +290,7 @@ async def gerar_composicao_agentes_async(servico: str) -> dict:
     
     # 2. Agente Engenheiro (Rascunha a CPU)
     completion_eng = await async_openai_client.beta.chat.completions.parse(
-        model="gpt-4o-2024-08-06",
+        model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT_ENGENHEIRO},
             {"role": "user", "content": f"SERVIÇO SOLICITADO: {servico}\n\nREFERÊNCIAS SINAPI ENCONTRADAS:\n{refs_texto}"}
@@ -289,7 +301,7 @@ async def gerar_composicao_agentes_async(servico: str) -> dict:
     
     # 3. Agente Revisor (Valida Matemática e Consistência)
     completion_rev = await async_openai_client.beta.chat.completions.parse(
-        model="gpt-4o-2024-08-06",
+        model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT_REVISOR},
             {"role": "user", "content": f"Audite e corrija matematicamente esta CPU bruta:\n{cpu_bruta.model_dump_json()}"}
