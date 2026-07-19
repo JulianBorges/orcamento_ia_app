@@ -1,7 +1,7 @@
 "use client";
 import { useState, useRef, useMemo, useEffect } from "react";
 import { UploadCloud, Loader2, Plus, Download, Trash2, AlertCircle, Sparkles } from "lucide-react";
-import { BudgetTable, BudgetItem } from "@/components/BudgetTable";
+import { BudgetTable, BudgetItem, recalculateNumbers } from "@/components/BudgetTable";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { CompositionCreatorModal, ComposicaoGerada } from "@/components/CompositionCreatorModal";
 import * as XLSX from "xlsx";
@@ -200,29 +200,30 @@ export default function Home() {
         setUploadProgress(0);
         
         // Atualiza a tabela imediatamente com os itens "PENDENTE"
-        const startIndex = append ? tableData.length : 0;
         const initialItems: BudgetItem[] = rows.map((r, i) => ({
              id: r.id,
-             item: r.is_macro_item ? "" : `1.${startIndex + i + 1}`,
-             codigo: '-',
-             base: '-',
+             item: r.item || "-",
+             codigo: r.codigo || '-',
+             base: r.base || '-',
              descricao: r.descricao,
-             descricao_legada: r.descricao,
-             und: r.unidade || '-',
-             quant: r.quantidade,
+             descricao_legada: r.descricao_legada || r.descricao,
+             und: r.unidade || r.und || '-',
+             quant: r.quantidade ?? r.quant ?? 1.0,
              valorUnit: r.valorUnit || 0.0,
-             total: (r.valorUnit || 0.0) * r.quantidade,
+             total: (r.valorUnit || 0.0) * (r.quantidade ?? r.quant ?? 1.0),
              is_macro_item: r.is_macro_item,
              macro_etapa_pai: r.macro_etapa_pai,
-             ai_status: r.is_macro_item ? '-' : 'PROCESSANDO',
-             ai_justificativa: r.is_macro_item ? '-' : 'Analisando via IA...'
+             ai_status: r.ai_status || (r.is_macro_item ? '-' : 'PROCESSANDO'),
+             ai_justificativa: r.ai_justificativa || (r.is_macro_item ? '-' : 'Analisando via IA...')
         }));
         
         // Limpa a fila do efeito dominó caso inicie novo lote
         pendingVisualUpdates.current = [];
         
-        // Atualiza o estado da tabela sincronicamente antes de iniciar o loop assíncrono
+        // Atualiza o estado da tabela sincronicamente passando pelo recalculate
         let currentTableData = append ? [...tableData, ...initialItems] : initialItems;
+        currentTableData = recalculateNumbers(currentTableData);
+        
         setTableData(currentTableData);
         
         // Chunker (Lotes de 50 para máxima velocidade)
@@ -384,13 +385,17 @@ export default function Home() {
 
         setUploadProgress(100);
         
+        // Garante a numeração perfeita antes de processar
+        const newRowsNumbered = recalculateNumbers(newRows);
+        
         // Inicia o processamento SINAPI agora com a lista estruturada!
-        startBatchProcessing(newRows, false);
+        startBatchProcessing(newRowsNumbered, false);
 
     } catch (err) {
         console.error(err);
         alert("Erro ao estruturar EAP. Vamos prosseguir como Lista Plana.");
-        startBatchProcessing(pendingFlatRows, false);
+        const fallbackNumbered = recalculateNumbers(pendingFlatRows);
+        startBatchProcessing(fallbackNumbered, false);
     }
   };
 
@@ -416,7 +421,7 @@ export default function Home() {
           "Quant": row.is_macro_item ? '' : Number(row.quant),
           "Valor Unit": row.is_macro_item ? '' : Number(row.valorUnit),
           "Valor c/ BDI": row.is_macro_item ? '' : Number((row.valorUnit * (1 + bdi/100)).toFixed(2)),
-          "Total": row.is_macro_item ? '' : Number(((row.valorUnit * (1 + bdi/100)) * row.quant).toFixed(2)),
+          "Total": Number(row.total.toFixed(2)),
           "Parecer IA": row.is_macro_item ? '' : (row.ai_status || ''),
           "Justificativa IA": row.is_macro_item ? '' : (row.ai_justificativa || '')
       }));
