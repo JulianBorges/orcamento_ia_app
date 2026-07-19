@@ -4,7 +4,10 @@ import asyncio
 import sqlite3
 from openai import AsyncOpenAI
 from pinecone import Pinecone
-from models.schemas import AnaliseItem
+from models.schemas import (
+    StatelessBatchItem, AnaliseItem, ComposicaoRequest, 
+    ComposicaoGerada, ComposicaoItem, EAPGenerationRequest, EAPResponse
+)
 from dotenv import load_dotenv
 from pathlib import Path
 from cachetools import TTLCache
@@ -301,3 +304,27 @@ async def gerar_composicao_agentes_async(servico: str) -> dict:
         response_format=ComposicaoGerada,
     )
     return completion_rev.choices[0].message.parsed.model_dump()
+
+async def gerar_eap_inteligente_async(request: EAPGenerationRequest) -> dict:
+    prompt = """Você é um engenheiro orçamentista sênior. 
+Recebeu uma lista plana (desestruturada) de serviços de obra. 
+Seu objetivo é analisar esses serviços e agrupá-los em macro-etapas lógicas de engenharia (ex: 1.0 INFRAESTRUTURA, 2.0 SUPERESTRUTURA, etc).
+Devolva um objeto estruturado contendo a lista de etapas, onde cada etapa tem um nome lógico e a lista exata dos IDs dos serviços que pertencem a ela.
+Atenção: 
+1. Você NÃO PODE omitir IDs. TODOS os IDs fornecidos devem ser alocados.
+2. Você NÃO PODE inventar IDs. Use apenas os IDs fornecidos.
+3. Agrupe de forma que a sequência cronológica da obra faça sentido."""
+
+    itens_json = [{"id": item.id, "descricao": item.descricao} for item in request.itens]
+    
+    completion = await async_openai_client.beta.chat.completions.parse(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": f"Serviços:\n{itens_json}"}
+        ],
+        response_format=EAPResponse,
+        temperature=0.0
+    )
+    
+    return completion.choices[0].message.parsed.model_dump()

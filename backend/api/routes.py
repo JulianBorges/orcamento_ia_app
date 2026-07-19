@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
-from models.schemas import BatchRequest, ComposicaoRequest, StatelessBatchRequest
-from services.ai_service import buscar_verdadeiro_hibrido_async, fluxo_multi_agentes_mapeamento_async, gerar_composicao_agentes_async
+from models.schemas import BatchRequest, ComposicaoRequest, StatelessBatchRequest, EAPGenerationRequest
+from services.ai_service import buscar_verdadeiro_hibrido_async, fluxo_multi_agentes_mapeamento_async, gerar_composicao_agentes_async, gerar_eap_inteligente_async
 from services.upload_service import processar_lote_stateless_async
 import asyncio
 
@@ -79,5 +79,14 @@ async def gerar_composicao(request: ComposicaoRequest):
         # A nova arquitetura Multi-Agentes encapsula a busca e a geração em um só fluxo inteligente
         composicao_final = await gerar_composicao_agentes_async(request.servico)
         return {"status": "SUCESSO", "data": composicao_final}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/orcamento/estruturar-eap")
+async def estruturar_eap(request: EAPGenerationRequest):
+    """Agrupa lista plana de serviços em Macro-etapas de engenharia usando GPT-4o-mini estruturado."""
+    try:
+        resultado = await gerar_eap_inteligente_async(request)
+        return {"status": "SUCESSO", "data": resultado}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

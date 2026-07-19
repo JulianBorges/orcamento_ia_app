@@ -25,6 +25,20 @@ class StatelessBatchRequest(BaseModel):
 class ComposicaoRequest(BaseModel):
     servico: str = Field(description="Descrição do serviço para gerar uma composição.")
 
+class EAPItemRequest(BaseModel):
+    id: str
+    descricao: str
+
+class EAPGenerationRequest(BaseModel):
+    itens: List[EAPItemRequest]
+
+class MacroEtapa(BaseModel):
+    nome: str = Field(description="Nome da Macro-etapa lógica (Ex: 1.0 INFRAESTRUTURA)")
+    ids_servicos: List[str] = Field(description="Lista exata de IDs de serviços que pertencem a esta macro-etapa.")
+
+class EAPResponse(BaseModel):
+    etapas: List[MacroEtapa] = Field(description="Lista de etapas geradas com seus serviços vinculados.")
+
 class ComposicaoItem(BaseModel):
     codigo_sinapi: str
     descricao: str

@@ -12,6 +12,8 @@ const excelRowSchema = z.object({
   quantidade: z.number().default(1.0),
   unidade: z.string().default("-"),
   valorUnit: z.number().default(0.0),
+  is_macro_item: z.boolean().default(false),
+  macro_etapa_pai: z.string().default("")
 });
 
 
@@ -20,6 +22,8 @@ export default function Home() {
   const [title, setTitle] = useState("Orçamento Base");
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showCreatorModal, setShowCreatorModal] = useState(false);
+  const [showFlatListModal, setShowFlatListModal] = useState(false);
+  const [pendingFlatRows, setPendingFlatRows] = useState<any[]>([]);
   const [creatorInitialQuery, setCreatorInitialQuery] = useState("");
   const [creatorTargetRowIndex, setCreatorTargetRowIndex] = useState<number | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -134,10 +138,11 @@ export default function Home() {
                 descricao = row[Object.keys(row)[0]] || "";
             }
             
-            // Macro-item detection: if quantity and value are missing/empty in raw data, it's a macro
+            // Macro-item detection: if quantity, value AND unit are missing/empty in raw data, it's a macro
             const isMissingQuant = rawQuantidade === undefined || String(rawQuantidade).trim() === "" || parseFloat(String(rawQuantidade)) === 0;
             const isMissingValor = rawValorUnit === undefined || String(rawValorUnit).trim() === "" || parseFloat(String(rawValorUnit).replace(',', '.')) === 0;
-            const is_macro_item = (isMissingQuant && isMissingValor) || String(row['Item'] || '').endsWith('.0');
+            const isMissingUnidade = unidade === undefined || String(unidade).trim() === "" || String(unidade).trim() === "-";
+            const is_macro_item = (isMissingQuant && isMissingValor && isMissingUnidade) || String(row['Item'] || '').endsWith('.0');
             
             if (is_macro_item) {
                 currentMacro = String(descricao);
@@ -167,11 +172,38 @@ export default function Home() {
             };
         });
 
+        let macroCount = 0;
+        rows.forEach(r => {
+            if (r.is_macro_item) macroCount++;
+        });
+
+        if (macroCount === 0) {
+            setPendingFlatRows(rows);
+            setShowFlatListModal(true);
+            setIsProcessing(false);
+            setUploadProgress(null);
+            return;
+        }
+
+        startBatchProcessing(rows, append);
+
+    } catch (err) {
+        console.error("Erro ao ler ou processar Excel:", err);
+        setIsProcessing(false);
+        setUploadProgress(null);
+        alert("Ocorreu um erro ao processar o arquivo Excel.");
+    }
+  };
+
+  const startBatchProcessing = async (rows: any[], append: boolean) => {
+        setIsProcessing(true);
+        setUploadProgress(0);
+        
         // Atualiza a tabela imediatamente com os itens "PENDENTE"
         const startIndex = append ? tableData.length : 0;
         const initialItems: BudgetItem[] = rows.map((r, i) => ({
              id: r.id,
-             item: `1.${startIndex + i + 1}`,
+             item: r.is_macro_item ? "" : `1.${startIndex + i + 1}`,
              codigo: '-',
              base: '-',
              descricao: r.descricao,
@@ -287,12 +319,78 @@ export default function Home() {
             setIsProcessing(false);
             setUploadProgress(null);
         }, 1000);
+  };
+
+  const generateEapWithAI = async () => {
+    try {
+        setIsProcessing(true);
+        setUploadProgress(10); // Status visual
         
+        const payload = {
+            itens: pendingFlatRows.map(r => ({ id: r.id, descricao: r.descricao }))
+        };
+
+        const res = await fetch(`/api/orcamento/estruturar-eap`, {
+            method: "POST",
+            headers: { 
+                "Content-Type": "application/json",
+                "x-api-key": process.env.NEXT_PUBLIC_API_KEY || "chave-secreta-padrao"
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) throw new Error("Falha ao gerar EAP com a IA.");
+        
+        const data = await res.json();
+        const etapas = data.data?.etapas || [];
+
+        // Reconstrói a lista inserindo as Macro-etapas
+        const newRows: any[] = [];
+        
+        etapas.forEach((etapa: any) => {
+            // Cria a linha fake de Macro-etapa
+            const macroRow = {
+                id: `macro_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                descricao: etapa.nome,
+                quantidade: 0,
+                unidade: "-",
+                valorUnit: 0,
+                is_macro_item: true,
+                macro_etapa_pai: ""
+            };
+            newRows.push(macroRow);
+
+            // Adiciona os itens filhos associados a ela
+            etapa.ids_servicos.forEach((id: string) => {
+                const originalItem = pendingFlatRows.find(r => r.id === id);
+                if (originalItem) {
+                    newRows.push({
+                        ...originalItem,
+                        macro_etapa_pai: etapa.nome
+                    });
+                }
+            });
+        });
+
+        // Adiciona qualquer item órfão que a IA esqueceu (fallback de segurança)
+        pendingFlatRows.forEach(originalItem => {
+            if (!newRows.find(r => r.id === originalItem.id)) {
+                newRows.push({
+                    ...originalItem,
+                    macro_etapa_pai: "Outros"
+                });
+            }
+        });
+
+        setUploadProgress(100);
+        
+        // Inicia o processamento SINAPI agora com a lista estruturada!
+        startBatchProcessing(newRows, false);
+
     } catch (err) {
-        console.error("Erro ao ler ou processar Excel:", err);
-        setIsProcessing(false);
-        setUploadProgress(null);
-        alert("Ocorreu um erro ao processar o arquivo Excel.");
+        console.error(err);
+        alert("Erro ao estruturar EAP. Vamos prosseguir como Lista Plana.");
+        startBatchProcessing(pendingFlatRows, false);
     }
   };
 
@@ -508,6 +606,42 @@ export default function Home() {
                             className="px-4 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-md transition-colors shadow-lg"
                         >
                             Acrescentar ao Final
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {showFlatListModal && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                <div className="bg-white dark:bg-[#18181b] border border-zinc-300 dark:border-zinc-700 p-6 rounded-xl shadow-2xl max-w-md w-full">
+                    <div className="flex items-center gap-3 text-zinc-900 dark:text-zinc-100 mb-4">
+                        <AlertCircle className="w-6 h-6 text-amber-400" />
+                        <h2 className="text-xl font-semibold">Lista Plana Detectada</h2>
+                    </div>
+                    <p className="text-zinc-400 dark:text-zinc-500 text-sm mb-6 leading-relaxed">
+                        Não identificámos etapas estruturais (como 1.0, 2.0 ou cabeçalhos) na sua planilha. 
+                        Deseja prosseguir assim mesmo ou usar a IA para estruturar uma EAP lógica automaticamente?
+                    </p>
+                    <div className="flex flex-col gap-3">
+                        <button 
+                            onClick={() => {
+                                setShowFlatListModal(false);
+                                startBatchProcessing(pendingFlatRows, false); // ou append
+                            }}
+                            className="w-full px-4 py-2 text-sm font-medium border border-zinc-200 dark:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md transition-colors"
+                        >
+                            Mapear como Lista Plana
+                        </button>
+                        <button 
+                            onClick={async () => {
+                                setShowFlatListModal(false);
+                                generateEapWithAI();
+                            }}
+                            className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white rounded-md transition-colors shadow-lg"
+                        >
+                            <Sparkles className="w-4 h-4" />
+                            Usar IA para Estruturar EAP
                         </button>
                     </div>
                 </div>
