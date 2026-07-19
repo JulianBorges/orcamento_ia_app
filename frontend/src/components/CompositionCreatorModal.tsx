@@ -51,7 +51,10 @@ export function CompositionCreatorModal({ isOpen, initialQuery = '', onClose, on
         try {
             const res = await fetch('/api/orcamento/gerar-composicao-ia', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'x-api-key': process.env.NEXT_PUBLIC_API_KEY || "chave-secreta-padrao"
+                },
                 body: JSON.stringify({ servico: query })
             });
 

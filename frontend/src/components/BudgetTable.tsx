@@ -160,7 +160,11 @@ const AutocompleteDescricaoCell = ({ initialValue, rowIndex, onUpdateRow }: Auto
         }
         setIsLoading(true);
         try {
-            const res = await fetch(`/api/sinapi/search?q=${encodeURIComponent(query)}`);
+            const res = await fetch(`/api/sinapi/search?q=${encodeURIComponent(query)}`, {
+                headers: {
+                    "x-api-key": process.env.NEXT_PUBLIC_API_KEY || "chave-secreta-padrao"
+                }
+            });
             if (res.ok) {
                 const data = await res.json();
                 setResults(data.results || []);
