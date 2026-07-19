@@ -297,7 +297,8 @@ export default function Home() {
           "Valor Unit": Number(row.valorUnit),
           "Valor c/ BDI": Number((row.valorUnit * (1 + bdi/100)).toFixed(2)),
           "Total": Number(((row.valorUnit * (1 + bdi/100)) * row.quant).toFixed(2)),
-          "Parecer IA": row.ai_status || ''
+          "Parecer IA": row.ai_status || '',
+          "Justificativa IA": row.ai_justificativa || ''
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(exportData);

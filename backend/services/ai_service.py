@@ -218,7 +218,7 @@ def agente_pesquisador_dossie(opcoes_pinecone: list) -> str:
         except (ValueError, TypeError):
             preco = 0.0
             
-        dossie = f"ID: {id_limpo} | Und: {und} | Custo Base: R$ {preco:.2f} | Descrição: {desc}"
+        dossie = f"Código: {id_limpo} | Und: {und} | Custo Base: R$ {preco:.2f} | Descrição: {desc}"
         linhas.append(dossie)
     
     return "\n".join(linhas)
