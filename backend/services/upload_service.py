@@ -42,14 +42,21 @@ async def process_item_with_semaphore(item: StatelessBatchItem, ai_function, *ar
                 return {"id": item.id, "status": "ERRO", "erro": str(e)}
 
 async def processar_real_ai(item: StatelessBatchItem, vector: list = None):
+    # Short-circuit: Pular processamento inútil se for apenas um título de EAP
+    if getattr(item, "is_macro_item", False):
+        return {"id": item.id, "status": "MACRO_ITEM", "quantidade_original": 0.0, "descricao_original": item.descricao}
+        
     descricao = item.descricao
     quantidade = item.quantidade
     
     if not descricao or str(descricao).strip() == "" or str(descricao).lower() == "nan":
         return {"id": item.id, "status": "TITULO_VAZIO", "quantidade_original": quantidade, "descricao_original": descricao}
         
+    # Construção do RAG Contextual
+    busca_contextualizada = f"Etapa: {item.macro_etapa_pai} -> Serviço: {descricao}" if getattr(item, "macro_etapa_pai", "") else descricao
+        
     try:
-        matches = await buscar_verdadeiro_hibrido_async(descricao, top_k=7, vector=vector)
+        matches = await buscar_verdadeiro_hibrido_async(busca_contextualizada, top_k=7, vector=vector)
         if not matches or matches[0]['score'] < 0.3:
             return {"id": item.id, "status": "REJEITADO_FILTRO_MATEMATICO", "justificativa": "Sem similaridade na base.", "quantidade_original": quantidade, "descricao_original": descricao}
             

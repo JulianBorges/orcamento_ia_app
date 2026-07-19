@@ -16,6 +16,8 @@ class StatelessBatchItem(BaseModel):
     quantidade: float = Field(default=1.0, description="Quantidade extraída do Excel")
     unidade: Optional[str] = Field(default="", description="Unidade de medida original do legado")
     valorUnit: Optional[float] = Field(default=0.0, description="Valor unitário original do legado")
+    is_macro_item: Optional[bool] = Field(default=False, description="Indica se é um título/cabeçalho da EAP")
+    macro_etapa_pai: Optional[str] = Field(default="", description="Nome do Cabeçalho que este item pertence")
 
 class StatelessBatchRequest(BaseModel):
     itens: List[StatelessBatchItem] = Field(description="Lista de itens em lote (chunk) enviados pelo frontend")

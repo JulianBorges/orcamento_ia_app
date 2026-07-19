@@ -23,6 +23,8 @@ export type BudgetItem = {
   quant: number;
   valorUnit: number;
   total: number;
+  is_macro_item?: boolean;
+  macro_etapa_pai?: string;
   ai_status?: string;
   ai_justificativa?: string;
   memoria_calculo?: any[];
@@ -324,22 +326,25 @@ export function BudgetTable({
     columnHelper.accessor("item", { 
         header: "Item", 
         size: 70,
-        cell: info => <CellInput initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'item', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 font-semibold outline-none px-1 rounded text-center" />
+        cell: info => <CellInput initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'item', v)} className={`w-full bg-transparent text-zinc-700 dark:text-zinc-300 font-semibold outline-none px-1 rounded text-center ${info.row.original.is_macro_item ? 'text-zinc-900 dark:text-zinc-100 font-bold' : ''}`} />
     }),
     columnHelper.accessor("codigo", { 
         header: "Código", 
         size: 100,
-        cell: info => <CodigoCell initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'codigo', v)} />
+        cell: info => info.row.original.is_macro_item ? <div className="text-center">-</div> : <CodigoCell initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'codigo', v)} />
     }),
     columnHelper.accessor("base", { 
         header: "Base", 
         size: 80,
-        cell: info => <CellInput initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'base', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 outline-none px-1 rounded text-center" />
+        cell: info => info.row.original.is_macro_item ? <div className="text-center">-</div> : <CellInput initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'base', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 outline-none px-1 rounded text-center" />
     }),
     columnHelper.accessor("descricao", { 
         header: "Descrição do Serviço",
         size: 600,
         cell: info => {
+            if (info.row.original.is_macro_item) {
+                return <div className="w-full px-2 font-bold text-zinc-900 dark:text-zinc-100 truncate">{info.getValue()}</div>;
+            }
             const hasMemory = info.row.original.memoria_calculo && info.row.original.memoria_calculo.length > 0;
             return (
                 <div className="flex items-center gap-2 w-full h-full group/desc">
@@ -367,6 +372,7 @@ export function BudgetTable({
         header: "Parecer IA",
         size: 110,
         cell: info => {
+            if (info.row.original.is_macro_item) return <div className="text-center">-</div>;
             const status = info.getValue() || 'PENDENTE';
             const just = info.row.original.ai_justificativa || '';
             
@@ -406,23 +412,24 @@ export function BudgetTable({
     columnHelper.accessor("und", { 
         header: "Und", 
         size: 60,
-        cell: info => <CellInput initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'und', v)} className="w-full bg-transparent text-zinc-400 dark:text-zinc-500 outline-none px-1 rounded text-center" />
+        cell: info => info.row.original.is_macro_item ? <div className="text-center">-</div> : <CellInput initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'und', v)} className="w-full bg-transparent text-zinc-400 dark:text-zinc-500 outline-none px-1 rounded text-center" />
     }),
     columnHelper.accessor("quant", { 
         header: "Quant.", 
         size: 90,
-        cell: info => <CellInput type="number" step="0.01" initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'quant', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 outline-none px-1 rounded text-center" />
+        cell: info => info.row.original.is_macro_item ? <div className="text-center">-</div> : <CellInput type="number" step="0.01" initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'quant', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 outline-none px-1 rounded text-center" />
     }),
     columnHelper.accessor("valorUnit", { 
         header: "Valor Unit", 
         size: 110,
-        cell: info => <CellInput type="number" step="0.01" initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'valorUnit', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 outline-none px-1 rounded text-center" />
+        cell: info => info.row.original.is_macro_item ? <div className="text-center">-</div> : <CellInput type="number" step="0.01" initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'valorUnit', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 outline-none px-1 rounded text-center" />
     }),
     columnHelper.display({
         id: "valorUnitBdi",
         header: "Valor c/ BDI",
         size: 110,
         cell: info => {
+            if (info.row.original.is_macro_item) return <div className="text-center">-</div>;
             const val = info.row.original.valorUnit * (1 + bdi / 100);
             return <div className="text-center px-1 text-zinc-700 dark:text-zinc-300 w-full">{val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>;
         }
@@ -432,6 +439,7 @@ export function BudgetTable({
         header: "Total",
         size: 130,
         cell: info => {
+            if (info.row.original.is_macro_item) return <div className="text-center">-</div>;
             const val = (info.row.original.valorUnit * (1 + bdi / 100)) * info.row.original.quant;
             return <div className="text-center px-1 font-semibold text-zinc-800 dark:text-zinc-200 w-full">{val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>;
         }
@@ -529,7 +537,7 @@ export function BudgetTable({
                         key={row.id} 
                         ref={rowVirtualizer.measureElement}
                         data-index={virtualRow.index}
-                        className="group hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition-colors duration-150 absolute top-0 left-0 w-full flex items-center py-2 z-10 hover:z-[90]"
+                        className={`group hover:bg-zinc-100 dark:hover:bg-zinc-800/60 transition-colors duration-150 absolute top-0 left-0 w-full flex items-center py-2 z-10 hover:z-[90] ${row.original.is_macro_item ? 'bg-zinc-100/80 dark:bg-zinc-800/50 border-y border-zinc-200 dark:border-zinc-700/50' : ''}`}
                         style={{
                             minHeight: '52px',
                             transform: `translateY(${virtualRow.start}px)`,

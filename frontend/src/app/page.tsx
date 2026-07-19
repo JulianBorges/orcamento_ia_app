@@ -103,10 +103,13 @@ export default function Home() {
         const worksheet = workbook.Sheets[firstSheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet);
         
+        let currentMacro = "";
         const rows = jsonData.map((row: any, index: number) => {
             let descricao = "";
+            let rawQuantidade = undefined;
             let quantidade = 1.0;
             let unidade = "";
+            let rawValorUnit = undefined;
             let valorUnit = 0.0;
             
             for (const key of Object.keys(row)) {
@@ -115,12 +118,14 @@ export default function Home() {
                     descricao = row[key];
                 }
                 else if (['quant', 'quantidade', 'qtd', 'qnt'].includes(lowerKey)) {
+                    rawQuantidade = row[key];
                     quantidade = parseFloat(row[key]) || 1.0;
                 }
                 else if (['und', 'un', 'unidade', 'medida'].includes(lowerKey)) {
                     unidade = String(row[key]);
                 }
                 else if (['valor', 'preco', 'preço', 'unitario', 'unitário', 'custo'].includes(lowerKey)) {
+                    rawValorUnit = row[key];
                     valorUnit = parseFloat(String(row[key]).replace(',', '.')) || 0.0;
                 }
             }
@@ -129,18 +134,31 @@ export default function Home() {
                 descricao = row[Object.keys(row)[0]] || "";
             }
             
+            // Macro-item detection: if quantity and value are missing/empty in raw data, it's a macro
+            const isMissingQuant = rawQuantidade === undefined || String(rawQuantidade).trim() === "" || parseFloat(String(rawQuantidade)) === 0;
+            const isMissingValor = rawValorUnit === undefined || String(rawValorUnit).trim() === "" || parseFloat(String(rawValorUnit).replace(',', '.')) === 0;
+            const is_macro_item = (isMissingQuant && isMissingValor) || String(row['Item'] || '').endsWith('.0');
+            
+            if (is_macro_item) {
+                currentMacro = String(descricao);
+            }
+            
             const parsed = excelRowSchema.safeParse({
                 descricao: String(descricao),
-                quantidade: isNaN(quantidade) ? 1.0 : quantidade,
+                quantidade: is_macro_item ? 0.0 : (isNaN(quantidade) ? 1.0 : quantidade),
                 unidade: String(unidade),
-                valorUnit: isNaN(valorUnit) ? 0.0 : valorUnit
+                valorUnit: is_macro_item ? 0.0 : (isNaN(valorUnit) ? 0.0 : valorUnit),
+                is_macro_item: is_macro_item,
+                macro_etapa_pai: is_macro_item ? "" : currentMacro
             });
             
             const validData = parsed.success ? parsed.data : {
                 descricao: "Item inválido detectado pelo Zod",
                 quantidade: 1.0,
                 unidade: "-",
-                valorUnit: 0.0
+                valorUnit: 0.0,
+                is_macro_item: false,
+                macro_etapa_pai: ""
             };
             
             return {
@@ -162,8 +180,10 @@ export default function Home() {
              quant: r.quantidade,
              valorUnit: r.valorUnit || 0.0,
              total: (r.valorUnit || 0.0) * r.quantidade,
-             ai_status: 'PROCESSANDO',
-             ai_justificativa: 'Analisando via IA...'
+             is_macro_item: r.is_macro_item,
+             macro_etapa_pai: r.macro_etapa_pai,
+             ai_status: r.is_macro_item ? '-' : 'PROCESSANDO',
+             ai_justificativa: r.is_macro_item ? '-' : 'Analisando via IA...'
         }));
         
         // Limpa a fila do efeito dominó caso inicie novo lote
@@ -183,7 +203,9 @@ export default function Home() {
                 descricao: item.descricao,
                 quantidade: item.quantidade,
                 unidade: item.unidade,
-                valorUnit: item.valorUnit
+                valorUnit: item.valorUnit,
+                is_macro_item: item.is_macro_item,
+                macro_etapa_pai: item.macro_etapa_pai
             }));
             let retries = 3;
             let success = false;
@@ -215,19 +237,19 @@ export default function Home() {
                             const meta = resData.metadados || {};
                             const isApproved = analise.status?.includes('ACEITO');
                             const aiError = analise.erro || resData.erro || resultRow.erro;
-                            const aiStatus = analise.status || resultRow.status || 'ERRO';
+                            const aiStatus = oldItem.is_macro_item ? '-' : (analise.status || resultRow.status || 'ERRO');
                             
                             const newItem = {
                                 ...oldItem,
-                                codigo: isApproved ? (meta.codigo || '-') : '-',
-                                base: isApproved ? "SINAPI" : "-",
-                                descricao: isApproved ? (meta.descricao || oldItem.descricao) : oldItem.descricao,
+                                codigo: oldItem.is_macro_item ? '-' : (isApproved ? (meta.codigo || '-') : '-'),
+                                base: oldItem.is_macro_item ? '-' : (isApproved ? "SINAPI" : "-"),
+                                descricao: oldItem.is_macro_item ? oldItem.descricao : (isApproved ? (meta.descricao || oldItem.descricao) : oldItem.descricao),
                                 descricao_legada: oldItem.descricao_legada || oldItem.descricao,
-                                und: isApproved ? (meta.unidade || '-') : '-',
-                                valorUnit: isApproved ? (meta.custo || 0.0) : 0.0,
-                                total: (isApproved ? (meta.custo || 0.0) : 0.0) * oldItem.quant,
+                                und: oldItem.is_macro_item ? '-' : (isApproved ? (meta.unidade || '-') : '-'),
+                                valorUnit: oldItem.is_macro_item ? 0.0 : (isApproved ? (meta.custo || 0.0) : 0.0),
+                                total: oldItem.is_macro_item ? 0.0 : ((isApproved ? (meta.custo || 0.0) : 0.0) * oldItem.quant),
                                 ai_status: aiStatus,
-                                ai_justificativa: analise.justificativa || resData.justificativa || aiError || 'Falha ao processar',
+                                ai_justificativa: oldItem.is_macro_item ? '-' : (analise.justificativa || resData.justificativa || aiError || 'Falha ao processar'),
                                 memoria_calculo: resData.memoria_calculo || []
                             };
                             
@@ -289,16 +311,16 @@ export default function Home() {
       
       const exportData = tableData.map(row => ({
           "Item": row.item,
-          "Código": row.codigo,
-          "Base": row.base,
+          "Código": row.is_macro_item ? '' : row.codigo,
+          "Base": row.is_macro_item ? '' : row.base,
           "Descrição": row.descricao || '',
-          "Und": row.und,
-          "Quant": Number(row.quant),
-          "Valor Unit": Number(row.valorUnit),
-          "Valor c/ BDI": Number((row.valorUnit * (1 + bdi/100)).toFixed(2)),
-          "Total": Number(((row.valorUnit * (1 + bdi/100)) * row.quant).toFixed(2)),
-          "Parecer IA": row.ai_status || '',
-          "Justificativa IA": row.ai_justificativa || ''
+          "Und": row.is_macro_item ? '' : row.und,
+          "Quant": row.is_macro_item ? '' : Number(row.quant),
+          "Valor Unit": row.is_macro_item ? '' : Number(row.valorUnit),
+          "Valor c/ BDI": row.is_macro_item ? '' : Number((row.valorUnit * (1 + bdi/100)).toFixed(2)),
+          "Total": row.is_macro_item ? '' : Number(((row.valorUnit * (1 + bdi/100)) * row.quant).toFixed(2)),
+          "Parecer IA": row.is_macro_item ? '' : (row.ai_status || ''),
+          "Justificativa IA": row.is_macro_item ? '' : (row.ai_justificativa || '')
       }));
 
       const worksheet = XLSX.utils.json_to_sheet(exportData);
