@@ -26,11 +26,19 @@ def recreate_index():
             spec=ServerlessSpec(cloud='aws', region='us-east-1')
         )
     print("Índice pronto.")
+    
+    try:
+        print("Limpando dados antigos no namespace vazio...")
+        pc.Index(INDEX_NAME).delete(delete_all=True, namespace="")
+    except Exception as e:
+        print(f"Aviso durante limpeza: {e}")
 
 def load_data():
     print("Carregando planilhas do SINAPI...")
+    base_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'base_sinapi')
+    
     df_analitica = pd.read_excel(
-        '../base_sinapi/SINAPI_Composicoes_Analiticas.xlsx', 
+        os.path.join(base_path, 'SINAPI_Composicoes_Analiticas.xlsx'), 
         skiprows=9,
         names=['grupo', 'codigo_composicao', 'tipo_item', 'codigo_item', 'descricao', 'unidade', 'coeficiente', 'situacao']
     )
@@ -38,7 +46,7 @@ def load_data():
     df_analitica['codigo_composicao'] = df_analitica['codigo_composicao'].astype(str).str.strip().str.replace('.0', '')
     
     df_precos = pd.read_excel(
-        '../base_sinapi/SINAPI_Composicoes_Sem-Desoneracao_RS.xlsx', 
+        os.path.join(base_path, 'SINAPI_Composicoes_Sem-Desoneracao_RS.xlsx'), 
         skiprows=9,
         names=['grupo', 'codigo_composicao', 'descricao', 'unidade', 'custo']
     )

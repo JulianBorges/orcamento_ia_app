@@ -60,9 +60,11 @@ def lexical_reranker(query: str, semantic_matches: list) -> list:
     norm_query = query.lower()
     norm_query = re.sub(r'(\d+(?:[.,/]\d+)?)\s*(mm|cm|m|kg|m2|m3|l|w|v|in|pol|")', r'\1\2', norm_query)
     
-    # Extrai tokens (palavras) removendo apenas pontuações soltas nas pontas para manter decimais inteiros
+    STOP_WORDS = {'de', 'da', 'do', 'das', 'dos', 'em', 'na', 'no', 'nas', 'nos', 'por', 'para', 'com', 'sem', 'a', 'o', 'as', 'os', 'e', 'ou', 'um', 'uma', 'uns', 'umas'}
+    
+    # Extrai tokens (palavras) removendo pontuações soltas e stop words
     raw_tokens = norm_query.split()
-    query_tokens = set(t.strip('.,;:()[]{}!') for t in raw_tokens if t.strip('.,;:()[]{}!'))
+    query_tokens = set(t.strip('.,;:()[]{}!') for t in raw_tokens if t.strip('.,;:()[]{}!') and t.strip('.,;:()[]{}!') not in STOP_WORDS)
     if not query_tokens:
         return semantic_matches
 
@@ -73,20 +75,27 @@ def lexical_reranker(query: str, semantic_matches: list) -> list:
         norm_desc = re.sub(r'(\d+(?:[.,/]\d+)?)\s*(mm|cm|m|kg|m2|m3|l|w|v|in|pol|")', r'\1\2', desc)
         
         desc_raw_tokens = norm_desc.split()
-        desc_tokens = set(t.strip('.,;:()[]{}!') for t in desc_raw_tokens if t.strip('.,;:()[]{}!'))
+        desc_tokens = set(t.strip('.,;:()[]{}!') for t in desc_raw_tokens if t.strip('.,;:()[]{}!') and t.strip('.,;:()[]{}!') not in STOP_WORDS)
         
-        lexical_score = 0.0
+        matches_word = 0
+        matches_number = 0
         
         for token in query_tokens:
             if token in desc_tokens:
-                # Recompensa gigante se for um número ou dimensão (ex: '50', '50mm', '1,5m', '3/4')
                 if any(char.isdigit() for char in token):
-                    lexical_score += 5.0
+                    matches_number += 1
                 else:
-                    lexical_score += 1.0
+                    matches_word += 1
                     
-        # Score Híbrido: Combina o Match Lexical com o Score Semântico original do Pinecone
-        hybrid_score = match['score'] + (lexical_score * 0.1)
+        # Proporção de acerto das palavras textuais (máximo +0.15)
+        text_tokens_count = len([t for t in query_tokens if not any(c.isdigit() for c in t)])
+        word_ratio = matches_word / text_tokens_count if text_tokens_count > 0 else 0
+        
+        # Bônus para números exatos, crucial na engenharia (máximo +0.30)
+        number_bonus = min(0.30, matches_number * 0.10)
+        
+        # Score Híbrido Proporcional
+        hybrid_score = match['score'] + (word_ratio * 0.15) + number_bonus
         
         reranked.append({
             **match,

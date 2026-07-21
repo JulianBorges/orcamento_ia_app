@@ -9,12 +9,12 @@ from services.ai_service import buscar_verdadeiro_hibrido_async, fluxo_multi_age
 from models.schemas import StatelessBatchItem
 
 # Semáforo global para concorrência da OpenAI
-# Aumentado para 50 para processamento ultra-rápido de lotes, confiando no retry backoff em caso de Rate Limit
-openai_semaphore = asyncio.Semaphore(50)
+# Reduzido para 30 para equilibrar throughput e evitar Rate Limits pesados (Fail-Fast Serverless)
+openai_semaphore = asyncio.Semaphore(30)
 
 async def process_item_with_semaphore(item: StatelessBatchItem, ai_function, *args):
     """Executa uma função de IA respeitando o limite do semáforo com retentativas (Retry Logic adaptada para Vercel Hobby)."""
-    max_retries = 3
+    max_retries = 2
     async with openai_semaphore:
         for attempt in range(max_retries):
             try:
@@ -36,8 +36,8 @@ async def process_item_with_semaphore(item: StatelessBatchItem, ai_function, *ar
                 # Considera Rate Limits, Timeouts e problemas de conexão da OpenAI como passíveis de Retry
                 if any(term in erro_str for term in ["429", "rate limit", "502", "503", "timeout", "timed out", "connection", "overloaded"]):
                     if attempt < max_retries - 1:
-                        # Backoff curto (2s, 4s) para não estourar o limite de 10-60s da Vercel Hobby
-                        await asyncio.sleep(2 ** (attempt + 1))
+                        # Fail-Fast Backoff (1.5s) para não estourar o limite de 10s da Vercel Hobby
+                        await asyncio.sleep(1.5 * (attempt + 1))
                         continue
                 return {"id": item.id, "status": "ERRO", "erro": str(e)}
 
@@ -58,7 +58,25 @@ async def processar_real_ai(item: StatelessBatchItem, vector: list = None):
     try:
         matches = await buscar_verdadeiro_hibrido_async(busca_contextualizada, top_k=7, vector=vector)
         if not matches or matches[0]['score'] < 0.3:
-            return {"id": item.id, "status": "REJEITADO_FILTRO_MATEMATICO", "justificativa": "Sem similaridade na base.", "quantidade_original": quantidade, "descricao_original": descricao}
+            memoria_calculo = []
+            for m in (matches or []):
+                m_meta = m.get('metadata', {})
+                memoria_calculo.append({
+                    "codigo": str(m_meta.get("codigo", "")).replace('comp_', ''),
+                    "descricao": m_meta.get("descricao", ""),
+                    "unidade": m_meta.get("unidade", ""),
+                    "custo": m_meta.get("custo", m_meta.get("preco", 0.0)),
+                    "score": round(m.get('score', 0) * 100)
+                })
+                
+            return {
+                "id": item.id, 
+                "status": "REJEITADO_FILTRO_MATEMATICO", 
+                "justificativa": "Sem similaridade na base.", 
+                "quantidade_original": quantidade, 
+                "descricao_original": descricao,
+                "memoria_calculo": memoria_calculo
+            }
             
         analise = await fluxo_multi_agentes_mapeamento_async(item, matches)
         

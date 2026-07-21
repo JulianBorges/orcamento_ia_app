@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 
 class AnaliseItem(BaseModel):
+    is_mapped: bool = Field(description="True se mapeado com sucesso, False caso rejeitado de acordo com as regras.")
     raciocinio_passo_a_passo: str = Field(description="O raciocínio lógico detalhado comparando dimensões, regras de escopo e compatibilidade de unidades ANTES de emitir o veredito.")
     status: str = Field(description="O veredito da análise: 'ACEITO', 'ACEITO COM RESSALVA' ou 'REJEITADO'")
     codigo_selecionado: Optional[str] = Field(None, description="O código SINAPI da opção selecionada. Null se REJEITADO.")

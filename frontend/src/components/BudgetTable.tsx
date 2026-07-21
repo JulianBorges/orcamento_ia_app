@@ -29,119 +29,8 @@ import {
     useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-
-export type BudgetItem = {
-  id: string;
-  item: string;
-  codigo: string;
-  base: string;
-  descricao: string;
-  und: string;
-  quant: number;
-  valorUnit: number;
-  total: number;
-  is_macro_item?: boolean;
-  level?: number;
-  macro_etapa_pai?: string;
-  ai_status?: string;
-  ai_justificativa?: string;
-  memoria_calculo?: any[];
-  descricao_legada?: string;
-};
-
-export const recalculateNumbers = (data: BudgetItem[]): BudgetItem[] => {
-    let counters = [0, 0, 0, 0, 0, 0];
-    let currentMacro = "";
-    let currentMacroLevel = -1;
-
-    // Passo 1: Numeração Top-Down
-    const numberedData = data.map((item) => {
-        let lvl = item.level ?? 0;
-        
-        if (item.is_macro_item) {
-            currentMacroLevel = lvl;
-            currentMacro = item.descricao;
-            counters[lvl]++;
-            // Zera os sub-contadores
-            for (let i = lvl + 1; i < counters.length; i++) {
-                counters[i] = 0;
-            }
-        } else {
-            // FORÇA SERVIÇOS A SEREM FILHOS DIRETOS DO MACRO ATUAL
-            lvl = currentMacroLevel === -1 ? 0 : currentMacroLevel + 1;
-            counters[lvl]++;
-            // Zera os sub-contadores
-            for (let i = lvl + 1; i < counters.length; i++) {
-                counters[i] = 0;
-            }
-        }
-
-        let itemNumber = "";
-        if (lvl === 0 && item.is_macro_item) {
-            itemNumber = `${counters[0] || 0}.0`;
-        } else {
-            const parts = counters.slice(0, lvl + 1);
-            if (parts[0] === 0) parts[0] = 0; // Ex: 0.1 se for filho de nenhum macro
-            itemNumber = parts.join('.');
-        }
-
-        return { 
-            ...item, 
-            level: lvl, // Atualiza o level real do serviço para visual e estrutura
-            item: itemNumber,
-            macro_etapa_pai: (lvl === 0 && item.is_macro_item) ? "" : (currentMacro || "Geral")
-        };
-    });
-
-    // Passo 2: Subtotais Bottom-Up
-    for (let i = 0; i < numberedData.length; i++) {
-        if (numberedData[i].is_macro_item) {
-            let sum = 0;
-            const macroLvl = numberedData[i].level!;
-            for (let j = i + 1; j < numberedData.length; j++) {
-                const childLvl = numberedData[j].level!;
-                if (childLvl <= macroLvl) break; // Acabou o escopo deste macro
-                if (!numberedData[j].is_macro_item) {
-                    sum += numberedData[j].total;
-                }
-            }
-            numberedData[i].total = sum;
-        }
-    }
-
-    return numberedData;
-};
-
-export const moveRowOrBlock = (data: BudgetItem[], oldIndex: number, newIndex: number): BudgetItem[] => {
-    if (oldIndex < 0 || oldIndex >= data.length || newIndex < 0 || newIndex >= data.length || oldIndex === newIndex) {
-        return data;
-    }
-
-    const itemToMove = data[oldIndex];
-    let blockLength = 1;
-    if (itemToMove.is_macro_item) {
-        const macroLvl = itemToMove.level!;
-        for (let i = oldIndex + 1; i < data.length; i++) {
-            if ((data[i].level!) <= macroLvl) break;
-            blockLength++;
-        }
-    }
-
-    const newData = [...data];
-    const block = newData.splice(oldIndex, blockLength);
-    
-    // Ajusta o newIndex se ele for afetado pela remoção do bloco antes dele
-    let adjustedNewIndex = newIndex;
-    if (newIndex > oldIndex) {
-        // Se estivermos movendo para baixo, o splice reduziu o tamanho do array antes do newIndex
-        // O newIndex original era baseado no array completo.
-        adjustedNewIndex -= (blockLength - 1); 
-    }
-
-    newData.splice(adjustedNewIndex, 0, ...block);
-    
-    return recalculateNumbers(newData);
-};
+import { useBudgetStore } from '@/store/useBudgetStore';
+import { BudgetItem, recalculateNumbers, moveRowOrBlock } from '@/utils/budgetUtils';
 
 const columnHelper = createColumnHelper<BudgetItem>();
 
@@ -544,16 +433,11 @@ const SortableRow = ({ row, virtualRow, data, setData, onOpenCreatorModal, rowVi
 };
 
 export function BudgetTable({ 
-    data = [], 
-    setData,
-    bdi = 25,
     onOpenCreatorModal
 }: { 
-    data: BudgetItem[], 
-    setData: React.Dispatch<React.SetStateAction<BudgetItem[]>>,
-    bdi?: number,
     onOpenCreatorModal?: (query: string, rowIndex?: number) => void
 }) {
+  const { tableData: data, setTableData: setData, bdi, updateData, updateRow, updateItemPosition } = useBudgetStore();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [memoryModalData, setMemoryModalData] = useState<{ matches: any[], rowIndex: number, legado: string } | null>(null);
 
@@ -567,95 +451,7 @@ export function BudgetTable({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [memoryModalData]);
 
-  const updateItemPosition = React.useCallback((oldIndex: number, newNumberText: string) => {
-      setData(oldData => {
-          const parts = String(newNumberText).split('.');
-          const targetMacro = parseInt(parts[0], 10);
-          const targetSub = parts.length > 1 ? parseInt(parts[1], 10) : 0;
-          
-          if (isNaN(targetMacro)) return oldData;
-          
-          let macroCounter = 0;
-          let subCounter = 0;
-          let targetIndex = -1;
-          
-          for (let i = 0; i < oldData.length; i++) {
-              if (oldData[i].is_macro_item) {
-                  macroCounter++;
-                  subCounter = 0;
-              } else {
-                  subCounter++;
-              }
-              
-              if (macroCounter === targetMacro && subCounter === targetSub) {
-                  targetIndex = i;
-                  break;
-              }
-          }
-          
-          // Se não encontrou o índice exato, acha o último item daquele Macro e coloca lá
-          if (targetIndex === -1) {
-              for (let i = oldData.length - 1; i >= 0; i--) {
-                  let mCount = oldData.slice(0, i + 1).filter(d => d.is_macro_item).length;
-                  if (mCount === targetMacro) {
-                      targetIndex = i;
-                      break;
-                  }
-              }
-          }
-          
-          // Se o Macro nem existe na planilha, não faz nada
-          if (targetIndex === -1) return oldData;
-          
-          const newData = [...oldData];
-          if (targetSub === 0 && !newData[oldIndex].is_macro_item) {
-              newData[oldIndex] = { ...newData[oldIndex], is_macro_item: true, quant: 0, valorUnit: 0, total: 0, und: "-" };
-          } else if (targetSub !== 0 && newData[oldIndex].is_macro_item) {
-              newData[oldIndex] = { ...newData[oldIndex], is_macro_item: false, quant: 1 };
-          }
-          
-          return moveRowOrBlock(newData, oldIndex, targetIndex);
-      });
-  }, [setData]);
 
-  const updateData = React.useCallback((rowIndex: number, columnId: string, value: any) => {
-      setData(old => {
-        const newData = old.map((row, index) => {
-          if (index === rowIndex) {
-            const newRow = { ...row, [columnId]: value };
-            if (columnId === 'quant' || columnId === 'valorUnit') {
-                newRow.total = Number(newRow.quant) * Number(newRow.valorUnit);
-            }
-            return newRow;
-          }
-          return row;
-        });
-        return recalculateNumbers(newData);
-      })
-  }, [setData]);
-
-  // Permite substituir o conteúdo completo da linha (Auto-Fill do Autocomplete)
-  const updateRow = React.useCallback((rowIndex: number, newRowData: Partial<BudgetItem>) => {
-      setData(old => {
-        const newData = old.map((row, index) => {
-          if (index === rowIndex) {
-            const newRow = { ...row, ...newRowData };
-            // Força o recalculo do total se as variáveis financeiras mudaram
-            if ('quant' in newRowData || 'valorUnit' in newRowData) {
-                newRow.total = Number(newRow.quant) * Number(newRow.valorUnit);
-            }
-            // Força o recalculo caso a IA limpe o status por ser um Auto-Fill manual
-            if ('codigo' in newRowData && !('ai_status' in newRowData)) {
-                newRow.ai_status = 'APROVADO_MANUALMENTE';
-                newRow.ai_justificativa = 'Item selecionado manualmente pelo Orçamentista no banco de dados.';
-            }
-            return newRow;
-          }
-          return row;
-        });
-        return recalculateNumbers(newData);
-      })
-  }, [setData]);
 
   const columns = React.useMemo(() => [
     columnHelper.accessor("item", { 
@@ -736,6 +532,9 @@ export function BudgetTable({
                 label = "ACEITO";
             } else if (status.includes("REJEITADO") || status.includes("ERRO") || status.includes("VAZIO")) {
                 color = "bg-red-500/10 text-red-400 border border-red-500/20";
+                if (status === "REJEITADO_FILTRO_MATEMATICO") {
+                    label = "REJEITADO";
+                }
             } else if (status === "PROCESSANDO") {
                 color = "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 animate-pulse";
             }

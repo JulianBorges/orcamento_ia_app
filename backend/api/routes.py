@@ -29,10 +29,22 @@ async def processar_lote(request: BatchRequest):
             
             # Filtro Matemático (Score do Pinecone: 1.0 é idêntico. Menor que 0.3 = lixo).
             if not matches or matches[0]['score'] < 0.3:
+                 memoria_calculo = []
+                 for m in (matches or []):
+                     m_meta = m.get('metadata', {})
+                     memoria_calculo.append({
+                         "codigo": str(m_meta.get("codigo", "")).replace('comp_', ''),
+                         "descricao": m_meta.get("descricao", ""),
+                         "unidade": m_meta.get("unidade", ""),
+                         "custo": m_meta.get("custo", m_meta.get("preco", 0.0)),
+                         "score": round(m.get('score', 0) * 100)
+                     })
+                     
                  return {
                      "descricao_legada": descricao, 
                      "status": "REJEITADO_FILTRO_MATEMATICO", 
-                     "analise": {"status": "REJEITADO", "codigo_selecionado": None, "justificativa": "Nenhuma correspondência semântica mínima encontrada na base SINAPI."}
+                     "analise": {"status": "REJEITADO", "codigo_selecionado": None, "justificativa": "Nenhuma correspondência semântica mínima encontrada na base SINAPI."},
+                     "memoria_calculo": memoria_calculo
                  }
                 
             analise = await fluxo_multi_agentes_mapeamento_async(descricao, matches)

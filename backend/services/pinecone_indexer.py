@@ -8,8 +8,20 @@ from tqdm import tqdm
 load_dotenv()
 
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-INDEX_NAME = "sinapi-base"
-BASE_SINAPI_PATH = os.getenv("BASE_SINAPI_PATH", "../base_sinapi")
+INDEX_NAME = "orcamento-engenharia" # Ajustado para bater com ai_service.py e ingest_sinapi_v2
+NAMESPACE = "composicoes_sinapi"
+
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+BASE_SINAPI_PATH = os.getenv("BASE_SINAPI_PATH", os.path.join(ROOT_DIR, "base_sinapi"))
+
+def limpar_pinecone(pc: Pinecone):
+    """Limpa todo o lixo do namespace padrão vazio antes de reindexar."""
+    try:
+        index = pc.Index(INDEX_NAME)
+        print("Limpando dados antigos no namespace vazio...")
+        index.delete(delete_all=True, namespace="")
+    except Exception as e:
+        print(f"Aviso durante limpeza: {e}")
 
 def inicializar_pinecone():
     """Conecta ao Pinecone e cria o índice se não existir."""
@@ -26,6 +38,8 @@ def inicializar_pinecone():
             metric='cosine',
             spec=ServerlessSpec(cloud='aws', region='us-east-1')
         )
+        
+    limpar_pinecone(pc)
     return pc.Index(INDEX_NAME)
 
 def processar_planilha_sinapi(nome_arquivo):
@@ -91,7 +105,7 @@ def processar_planilha_sinapi(nome_arquivo):
             })
             
         if vectors:
-            index.upsert(vectors=vectors)
+            index.upsert(vectors=vectors, namespace=NAMESPACE)
         
         itens_indexados += len(ids)
 
@@ -99,7 +113,7 @@ def processar_planilha_sinapi(nome_arquivo):
 
 if __name__ == "__main__":
     # Script para ser executado manualmente para inicializar o banco
-    arquivo_exemplo = "sinapi_rs.xlsx"
+    arquivo_exemplo = "SINAPI_Composicoes_Sem-Desoneracao_RS.xlsx"
     try:
         total = processar_planilha_sinapi(arquivo_exemplo)
         print(f"\nSucesso! {total} itens indexados no Pinecone com metadados ricos.")

@@ -1,11 +1,13 @@
 "use client";
 import { useState, useRef, useMemo, useEffect } from "react";
 import { UploadCloud, Loader2, Plus, Download, Trash2, AlertCircle, Sparkles } from "lucide-react";
-import { BudgetTable, BudgetItem, recalculateNumbers } from "@/components/BudgetTable";
+import { BudgetTable } from "@/components/BudgetTable";
+import { BudgetItem, recalculateNumbers } from "@/utils/budgetUtils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { CompositionCreatorModal, ComposicaoGerada } from "@/components/CompositionCreatorModal";
 import * as XLSX from "xlsx";
 import { z } from "zod";
+import { useBudgetStore } from "@/store/useBudgetStore";
 
 const excelRowSchema = z.object({
   descricao: z.string().min(1, "Descrição vazia").default("Item sem descrição"),
@@ -18,8 +20,7 @@ const excelRowSchema = z.object({
 
 
 export default function Home() {
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [title, setTitle] = useState("Orçamento Base");
+  const [isMounted, setIsMounted] = useState(false);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showCreatorModal, setShowCreatorModal] = useState(false);
   const [showFlatListModal, setShowFlatListModal] = useState(false);
@@ -28,15 +29,21 @@ export default function Home() {
   const [creatorTargetRowIndex, setCreatorTargetRowIndex] = useState<number | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
 
-  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [tableData, setTableData] = useState<BudgetItem[]>([]);
-  const [bdi, setBdi] = useState(25.0);
+  const {
+    tableData, bdi, title, isProcessing, uploadProgress,
+    setTableData, setBdi, setTitle, setIsProcessing, setUploadProgress, clearBudget
+  } = useBudgetStore();
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingVisualUpdates = useRef<any[]>([]);
 
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   // Efeito Dominó (Fila Global)
   useEffect(() => {
+      if (!isMounted) return;
       const interval = setInterval(() => {
           if (pendingVisualUpdates.current.length > 0) {
               const nextUpdate = pendingVisualUpdates.current.shift();
@@ -46,30 +53,7 @@ export default function Home() {
           }
       }, 100);
       return () => clearInterval(interval);
-  }, []);
-
-  // Carregar do LocalStorage no Mount
-  useEffect(() => {
-    const saved = localStorage.getItem("orcamento_data");
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed.tableData) setTableData(parsed.tableData);
-        if (parsed.bdi) setBdi(parsed.bdi);
-        if (parsed.title) setTitle(parsed.title);
-      } catch (e) {
-        console.error("Erro ao carregar localStorage", e);
-      }
-    }
-    setIsLoaded(true);
-  }, []);
-
-  // Salvar no LocalStorage sempre que alterar
-  useEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem("orcamento_data", JSON.stringify({ tableData, bdi, title }));
-    }
-  }, [tableData, bdi, title, isLoaded]);
+  }, [isMounted, setTableData]);
 
   const totalComBdi = useMemo(() => {
       return tableData.reduce((acc, row) => {
@@ -270,7 +254,7 @@ export default function Home() {
                             const meta = resData.metadados || {};
                             const isApproved = analise.status?.includes('ACEITO');
                             const aiError = analise.erro || resData.erro || resultRow.erro;
-                            const aiStatus = oldItem.is_macro_item ? '-' : (analise.status || resultRow.status || 'ERRO');
+                            const aiStatus = oldItem.is_macro_item ? '-' : (analise.status || resData.status || resultRow.status || 'ERRO');
                             
                             const newItem = {
                                 ...oldItem,
@@ -399,11 +383,9 @@ export default function Home() {
     }
   };
 
-  const clearBudget = () => {
+  const handleClearBudget = () => {
       if (window.confirm("Tem certeza que deseja limpar todo o orçamento? Esta ação não pode ser desfeita.")) {
-          setTableData([]);
-          setTitle("Orçamento Base");
-          setBdi(25.0);
+          clearBudget();
           pendingVisualUpdates.current = [];
           if (fileInputRef.current) fileInputRef.current.value = "";
       }
@@ -459,6 +441,10 @@ export default function Home() {
       }
       setCreatorTargetRowIndex(null);
   };
+
+  if (!isMounted) {
+    return null; // Evita Hydration Mismatch
+  }
 
   return (
     <div className="min-h-screen bg-zinc-100 dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-sans selection:bg-indigo-500/30">
@@ -541,9 +527,6 @@ export default function Home() {
         {/* Tabela Wrapper */}
         <div className="w-full mt-6 flex-1 h-full">
           <BudgetTable 
-              data={tableData} 
-              setData={setTableData} 
-              bdi={bdi} 
               onOpenCreatorModal={(q, rowIndex) => {
                   setCreatorInitialQuery(q);
                   setCreatorTargetRowIndex(rowIndex ?? null);
@@ -564,7 +547,7 @@ export default function Home() {
                         <Plus className="w-4 h-4" /> Carregar Mais Itens
                     </button>
                     <button 
-                        onClick={clearBudget}
+                        onClick={handleClearBudget}
                         disabled={isProcessing}
                         className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-sm font-medium rounded-md transition-colors disabled:opacity-50"
                     >
