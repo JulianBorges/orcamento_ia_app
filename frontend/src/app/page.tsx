@@ -6,6 +6,8 @@ import { BudgetItem, recalculateNumbers } from "@/utils/budgetUtils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { CompositionCreatorModal, ComposicaoGerada } from "@/components/CompositionCreatorModal";
 import * as XLSX from "xlsx";
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 import { z } from "zod";
 import { useBudgetStore } from "@/store/useBudgetStore";
 
@@ -391,28 +393,59 @@ export default function Home() {
       }
   };
 
-  const downloadExcel = () => {
+  const downloadExcel = async () => {
       if (tableData.length === 0) return;
       
-      const exportData = tableData.map(row => ({
-          "Item": row.item,
-          "Código": row.is_macro_item ? '' : row.codigo,
-          "Base": row.is_macro_item ? '' : row.base,
-          "Descrição": row.descricao || '',
-          "Und": row.is_macro_item ? '' : row.und,
-          "Quant": row.is_macro_item ? '' : Number(row.quant),
-          "Valor Unit": row.is_macro_item ? '' : Number(row.valorUnit),
-          "Valor c/ BDI": row.is_macro_item ? '' : Number((row.valorUnit * (1 + bdi/100)).toFixed(2)),
-          "Total": Number(row.total.toFixed(2)),
-          "Parecer IA": row.is_macro_item ? '' : (row.ai_status || ''),
-          "Justificativa IA": row.is_macro_item ? '' : (row.ai_justificativa || '')
-      }));
-
-      const worksheet = XLSX.utils.json_to_sheet(exportData);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Orçamento");
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Orçamento');
       
-      XLSX.writeFile(workbook, `${title.replace(/\s+/g, '_')}_${new Date().getTime()}.xlsx`);
+      // Cabeçalhos
+      const headers = [
+          { header: 'Item', key: 'item', width: 10 },
+          { header: 'Código', key: 'codigo', width: 15 },
+          { header: 'Base', key: 'base', width: 12 },
+          { header: 'Descrição', key: 'descricao', width: 50 },
+          { header: 'Und', key: 'und', width: 8 },
+          { header: 'Quant', key: 'quant', width: 12 },
+          { header: 'Valor Unit', key: 'valorUnit', width: 15 },
+          { header: 'Valor c/ BDI', key: 'valorBdi', width: 15 },
+          { header: 'Total', key: 'total', width: 15 },
+          { header: 'Parecer IA', key: 'parecer', width: 15 },
+          { header: 'Justificativa IA', key: 'justificativa', width: 40 }
+      ];
+      worksheet.columns = headers;
+      
+      // Estilo do cabeçalho
+      worksheet.getRow(1).font = { bold: true };
+      
+      // Preenchendo linhas
+      tableData.forEach((row, index) => {
+          const rowData = {
+              item: row.item,
+              codigo: row.is_macro_item ? '' : row.codigo,
+              base: row.is_macro_item ? '' : row.base,
+              descricao: row.descricao || '',
+              und: row.is_macro_item ? '' : row.und,
+              quant: row.is_macro_item ? '' : Number(row.quant),
+              valorUnit: row.is_macro_item ? '' : Number(row.valorUnit),
+              valorBdi: row.is_macro_item ? '' : Number((row.valorUnit * (1 + bdi/100)).toFixed(2)),
+              total: Number(row.total.toFixed(2)),
+              parecer: row.is_macro_item ? '' : (row.ai_status || ''),
+              justificativa: row.is_macro_item ? '' : (row.ai_justificativa || '')
+          };
+          
+          const addedRow = worksheet.addRow(rowData);
+          
+          // Se for macro-etapa, aplica negrito na linha inteira
+          if (row.is_macro_item) {
+              addedRow.font = { bold: true };
+          }
+      });
+      
+      // Gerando buffer e baixando
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(blob, `${title.replace(/\s+/g, '_')}_${new Date().getTime()}.xlsx`);
   };
 
   const handleAddCustomComposition = (composicao: ComposicaoGerada, originalQuery: string) => {
