@@ -206,7 +206,9 @@ const AutocompleteDescricaoCell = ({ initialValue, rowIndex, onUpdateRow, onOpen
             base: "SINAPI",
             descricao: item.descricao,
             und: item.unidade || "-",
-            valorUnit: Number(item.preco) || 0
+            valorUnit: Number(item.preco) || 0,
+            ai_status: "SUBSTITUIDO",
+            ai_justificativa: "Item substituído manualmente pelo usuário."
         });
     };
 
@@ -523,17 +525,25 @@ export function BudgetTable({
             
             let color = "bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 dark:text-zinc-400";
             let label = status.replace(/_/g, ' ');
+            let tooltipLabel = label;
             
             if (status.includes("ACEITO COM") || status.includes("RESSALVA") || status.includes("PREMISSA")) {
                 color = "bg-amber-500/10 text-amber-400 border border-amber-500/20";
-                label = "ACEITO*";
+                label = "RESSALVA";
+                tooltipLabel = "ACEITO COM RESSALVA";
             } else if (status === "ACEITO" || status.includes("APROVADO")) {
                 color = "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
                 label = "ACEITO";
+                tooltipLabel = "ACEITO";
+            } else if (status === "SUBSTITUIDO") {
+                color = "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20";
+                label = "SUBSTITUÍDO";
+                tooltipLabel = "SUBSTITUÍDO";
             } else if (status.includes("REJEITADO") || status.includes("ERRO") || status.includes("VAZIO")) {
                 color = "bg-red-500/10 text-red-400 border border-red-500/20";
                 if (status === "REJEITADO_FILTRO_MATEMATICO") {
                     label = "REJEITADO";
+                    tooltipLabel = "REJEITADO";
                 }
             } else if (status === "PROCESSANDO") {
                 color = "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 animate-pulse";
@@ -546,7 +556,7 @@ export function BudgetTable({
                     </div>
                     {just && (
                         <div className="absolute left-full ml-3 top-0 w-80 p-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg shadow-2xl opacity-0 invisible group-hover/tooltip:opacity-100 group-hover/tooltip:visible transition-all duration-100 z-[9999] text-xs text-zinc-700 dark:text-zinc-300 font-normal whitespace-normal leading-relaxed pointer-events-none">
-                            <div className="font-semibold text-zinc-900 dark:text-zinc-100 mb-1">{label}</div>
+                            <div className="font-semibold text-zinc-900 dark:text-zinc-100 mb-1">{tooltipLabel}</div>
                             {just}
                             <div className="absolute top-2 -left-1.5 w-3 h-3 bg-white dark:bg-zinc-900 border-l border-t border-zinc-200 dark:border-zinc-800 -rotate-45"></div>
                         </div>
@@ -782,7 +792,7 @@ export function BudgetTable({
                                                     descricao: match.descricao,
                                                     valorUnit: Number(match.custo) || 0,
                                                     und: match.unidade,
-                                                    ai_status: 'APROVADO_MANUALMENTE',
+                                                    ai_status: 'SUBSTITUIDO',
                                                     ai_justificativa: 'Composição substituída manualmente pelo usuário via Memória de Cálculo.',
                                                     base: 'SINAPI'
                                                 });

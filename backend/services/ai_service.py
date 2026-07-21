@@ -6,7 +6,8 @@ from openai import AsyncOpenAI
 from pinecone import Pinecone
 from models.schemas import (
     StatelessBatchItem, AnaliseItem, ComposicaoRequest, 
-    ComposicaoGerada, ComposicaoItem, EAPGenerationRequest, EAPResponse
+    ComposicaoGerada, ComposicaoItem, EAPGenerationRequest, EAPResponse,
+    LoteCorrigido
 )
 from dotenv import load_dotenv
 from pathlib import Path
@@ -16,22 +17,12 @@ load_dotenv()
 async_openai_client = AsyncOpenAI()
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 
-# Conexão Global Read-Only para otimizar Lotes na Vercel
-GLOBAL_SQLITE_CONN = None
-
 # Cache Semântico em Memória: Armazena até 1000 buscas recentes por 1 hora
 semantic_cache = TTLCache(maxsize=1000, ttl=3600)
 
 def get_sqlite_conn():
-    global GLOBAL_SQLITE_CONN
-    if GLOBAL_SQLITE_CONN is None:
-        db_path = Path(__file__).parent.parent / "sinapi.db"
-        try:
-            # check_same_thread=False é seguro apenas para leitura
-            GLOBAL_SQLITE_CONN = sqlite3.connect(str(db_path), check_same_thread=False)
-        except Exception:
-            return sqlite3.connect(str(db_path))
-    return GLOBAL_SQLITE_CONN
+    db_path = Path(__file__).parent.parent / "sinapi.db"
+    return sqlite3.connect(str(db_path))
 
 # O índice deve existir. Falhamos rápido (Fail-Fast) se houver erro para não mascarar problemas.
 try:
@@ -45,6 +36,32 @@ def load_prompt(filename):
         return f.read()
 
 SYSTEM_PROMPT = load_prompt("mapeamento.md")
+SYSTEM_PROMPT_CORRETOR = load_prompt("corretor.md")
+
+async def corrigir_descricoes_lote_async(itens: list[dict]) -> dict:
+    """
+    Função em lote para o LLM Normalizador.
+    Espera uma lista de dicionários {"id": "1", "descricao_original": "..."}
+    Retorna um dicionário {id: descricao_corrigida}
+    """
+    if not itens:
+        return {}
+        
+    try:
+        response = await async_openai_client.beta.chat.completions.parse(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT_CORRETOR},
+                {"role": "user", "content": str(itens)}
+            ],
+            response_format=LoteCorrigido,
+            temperature=0.1
+        )
+        lote_corrigido = response.choices[0].message.parsed
+        return {item.id: item.descricao_corrigida for item in lote_corrigido.itens}
+    except Exception as e:
+        print(f"Erro na normalização em lote: {e}")
+        return {}
 
 def lexical_reranker(query: str, semantic_matches: list) -> list:
     """
@@ -143,8 +160,8 @@ def buscar_sqlite_sync(query: str, top_k: int = 15):
     fts_query = " ".join([f"{t}*" for t in tokens])
     
     conn = get_sqlite_conn()
-    cursor = conn.cursor()
     try:
+        cursor = conn.cursor()
         cursor.execute('''
             SELECT codigo, descricao, preco, unidade 
             FROM composicoes 
@@ -169,6 +186,8 @@ def buscar_sqlite_sync(query: str, top_k: int = 15):
     except Exception as e:
         print("Erro SQLite FTS:", e)
         return []
+    finally:
+        conn.close()
 
 async def buscar_sqlite_async(query: str, top_k: int = 15):
     loop = asyncio.get_event_loop()

@@ -210,8 +210,8 @@ export default function Home() {
         
         setTableData(currentTableData);
         
-        // Chunker (Lotes de 50 para máxima velocidade)
-        const chunkSize = 50;
+        // Chunker (Lotes de 15 para máxima velocidade e evitar Timeout do Next.js)
+        const chunkSize = 15;
         let completed = 0;
         
         for (let i = 0; i < rows.length; i += chunkSize) {

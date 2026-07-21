@@ -19,13 +19,40 @@ async def search_sinapi(q: str):
 async def processar_lote(request: BatchRequest):
     """Processa dezenas de itens simultaneamente (Assíncrono/Batching)."""
     
-    async def processar_unico(descricao: str):
+    # Pre-processamento / Correção em lote
+    from services.ai_service import corrigir_descricoes_lote_async
+    
+    valid_descriptions = [d.strip() for d in request.descriptions if d.strip() and str(d).lower() != "nan"]
+    payload_correcao = [{"id": str(i), "descricao_original": d} for i, d in enumerate(valid_descriptions)]
+    
+    correcoes = {}
+    normalizer_semaphore = asyncio.Semaphore(5)
+    
+    async def process_norm_chunk(chunk):
+        async with normalizer_semaphore:
+            return await corrigir_descricoes_lote_async(chunk)
+            
+    norm_tasks = []
+    chunk_size_norm = 50
+    for i in range(0, len(payload_correcao), chunk_size_norm):
+        chunk = payload_correcao[i:i + chunk_size_norm]
+        norm_tasks.append(process_norm_chunk(chunk))
+        
+    resultados_norm = await asyncio.gather(*norm_tasks)
+    for r in resultados_norm:
+        if r:
+            correcoes.update(r)
+    
+    desc_map = {str(i): correcoes.get(str(i), d) for i, d in enumerate(valid_descriptions)}
+    
+    async def processar_unico(idx_str, descricao: str):
         descricao = descricao.strip()
         if not descricao or str(descricao).lower() == "nan":
             return {"descricao_legada": descricao, "status": "TITULO_VAZIO", "analise": None}
         
         try:
-            matches = await buscar_verdadeiro_hibrido_async(descricao, top_k=10)
+            descricao_pesquisa = desc_map.get(idx_str, descricao)
+            matches = await buscar_verdadeiro_hibrido_async(descricao_pesquisa, top_k=10)
             
             # Filtro Matemático (Score do Pinecone: 1.0 é idêntico. Menor que 0.3 = lixo).
             if not matches or matches[0]['score'] < 0.3:
@@ -47,7 +74,7 @@ async def processar_lote(request: BatchRequest):
                      "memoria_calculo": memoria_calculo
                  }
                 
-            analise = await fluxo_multi_agentes_mapeamento_async(descricao, matches)
+            analise = await fluxo_multi_agentes_mapeamento_async(descricao_pesquisa, matches)
             
             # Recuperar metadados do item selecionado pela IA
             codigo_selecionado = str(analise.codigo_selecionado).replace('comp_', '')
@@ -66,7 +93,7 @@ async def processar_lote(request: BatchRequest):
             return {"descricao_legada": descricao, "status": "ERRO", "erro": str(e)}
 
     # Roda todas as requisições em paralelo no Event Loop! O tempo cai de Minutos para Segundos.
-    tarefas = [processar_unico(desc) for desc in request.descriptions]
+    tarefas = [processar_unico(str(i), desc) for i, desc in enumerate(request.descriptions)]
     resultados = await asyncio.gather(*tarefas)
     
     return {"resultados": resultados}

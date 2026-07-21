@@ -52,8 +52,10 @@ async def processar_real_ai(item: StatelessBatchItem, vector: list = None):
     if not descricao or str(descricao).strip() == "" or str(descricao).lower() == "nan":
         return {"id": item.id, "status": "TITULO_VAZIO", "quantidade_original": quantidade, "descricao_original": descricao}
         
-    # Construção do RAG Contextual
-    busca_contextualizada = f"Etapa: {item.macro_etapa_pai} -> Serviço: {descricao}" if getattr(item, "macro_etapa_pai", "") else descricao
+    descricao_pesquisa = getattr(item, 'descricao_enriquecida', None) or descricao
+    
+    # Construção do RAG Contextual usando a descrição limpa
+    busca_contextualizada = f"Etapa: {item.macro_etapa_pai} -> Serviço: {descricao_pesquisa}" if getattr(item, "macro_etapa_pai", "") else descricao_pesquisa
         
     try:
         matches = await buscar_verdadeiro_hibrido_async(busca_contextualizada, top_k=7, vector=vector)
@@ -117,25 +119,67 @@ async def processar_lote_stateless_async(itens: list[StatelessBatchItem]):
     
     # 1. Filtra itens validos para evitar tokens desnecessários
     valid_items = []
-    valid_texts = []
     
     for item in itens:
         desc = str(item.descricao).strip()
         if desc and desc.lower() != "nan":
             valid_items.append(item)
-            valid_texts.append(desc)
             
-    # 2. Gera todos os Embeddings do Lote inteiro numa única requisição (Economiza 50x de Requests)
+    # 1.5 Correção e Enriquecimento em Lote (Agente Normalizador) com Chunking
+    from services.ai_service import corrigir_descricoes_lote_async
+    
+    payload_correcao = [{"id": it.id, "descricao_original": it.descricao} for it in valid_items]
+    correcoes = {}
+    
+    normalizer_semaphore = asyncio.Semaphore(5)
+    
+    async def process_norm_chunk(chunk):
+        async with normalizer_semaphore:
+            return await corrigir_descricoes_lote_async(chunk)
+            
+    norm_tasks = []
+    chunk_size_norm = 50
+    for i in range(0, len(payload_correcao), chunk_size_norm):
+        chunk = payload_correcao[i:i + chunk_size_norm]
+        norm_tasks.append(process_norm_chunk(chunk))
+        
+    resultados_norm = await asyncio.gather(*norm_tasks)
+    for r in resultados_norm:
+        if r:
+            correcoes.update(r)
+    
+    valid_texts = []
+    for it in valid_items:
+        # Usa a corrigida se disponível, senão fallback para original
+        desc_enriquecida = correcoes.get(it.id) or it.descricao
+        it.descricao_enriquecida = desc_enriquecida
+        valid_texts.append(desc_enriquecida)
+            
+    # 2. Gera todos os Embeddings do Lote com Chunking
     embeddings_map = {}
     if valid_texts:
-        try:
-            # Batching embedding API
-            res = await async_openai_client.embeddings.create(model="text-embedding-3-small", input=valid_texts)
-            for i, data in enumerate(res.data):
-                embeddings_map[valid_items[i].id] = data.embedding
-        except Exception as e:
-            print(f"Erro no Batch Embedding: {str(e)}")
-            # Se falhar o lote, as funções internas ainda tentarão item por item, pois `vector=None`
+        emb_semaphore = asyncio.Semaphore(10)
+        
+        async def process_emb_chunk(chunk_texts, chunk_items):
+            async with emb_semaphore:
+                try:
+                    res = await async_openai_client.embeddings.create(model="text-embedding-3-small", input=chunk_texts)
+                    return {chunk_items[j].id: data.embedding for j, data in enumerate(res.data)}
+                except Exception as e:
+                    print(f"Erro no Batch Embedding: {str(e)}")
+                    return {}
+                    
+        emb_tasks = []
+        chunk_size_emb = 100
+        for i in range(0, len(valid_texts), chunk_size_emb):
+            chunk_texts = valid_texts[i:i + chunk_size_emb]
+            chunk_items = valid_items[i:i + chunk_size_emb]
+            emb_tasks.append(process_emb_chunk(chunk_texts, chunk_items))
+            
+        resultados_emb = await asyncio.gather(*emb_tasks)
+        for r in resultados_emb:
+            if r:
+                embeddings_map.update(r)
     
     # 3. Processa
     async def run_task(item):

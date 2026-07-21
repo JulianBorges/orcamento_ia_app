@@ -59,8 +59,8 @@ export const useBudgetStore = create<BudgetState>()(
               newRow.total = Number(newRow.quant) * Number(newRow.valorUnit);
             }
             if ('codigo' in newRowData && !('ai_status' in newRowData)) {
-              newRow.ai_status = 'APROVADO_MANUALMENTE';
-              newRow.ai_justificativa = 'Item selecionado manualmente pelo Orçamentista no banco de dados.';
+              newRow.ai_status = 'SUBSTITUIDO';
+              newRow.ai_justificativa = 'Item substituído manualmente pelo usuário.';
             }
             return newRow;
           }

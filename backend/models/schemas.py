@@ -19,9 +19,17 @@ class StatelessBatchItem(BaseModel):
     valorUnit: Optional[float] = Field(default=0.0, description="Valor unitário original do legado")
     is_macro_item: Optional[bool] = Field(default=False, description="Indica se é um título/cabeçalho da EAP")
     macro_etapa_pai: Optional[str] = Field(default="", description="Nome do Cabeçalho que este item pertence")
+    descricao_enriquecida: Optional[str] = Field(default=None, description="Descrição após correção e expansão léxica pelo Corretor LLM")
 
 class StatelessBatchRequest(BaseModel):
     itens: List[StatelessBatchItem] = Field(description="Lista de itens em lote (chunk) enviados pelo frontend")
+
+class DescricaoCorrigida(BaseModel):
+    id: str = Field(description="ID original do item recebido no payload")
+    descricao_corrigida: str = Field(description="A descrição corrigida, sem alucinar especificações não existentes")
+
+class LoteCorrigido(BaseModel):
+    itens: List[DescricaoCorrigida] = Field(description="Lista de itens processados e corrigidos")
 
 class ComposicaoRequest(BaseModel):
     servico: str = Field(description="Descrição do serviço para gerar uma composição.")
