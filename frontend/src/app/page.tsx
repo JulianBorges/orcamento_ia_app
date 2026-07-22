@@ -498,26 +498,30 @@ export default function Home() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950 p-4">
-        <div className="max-w-md w-full bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 p-8 text-center space-y-6">
-          <div className="mx-auto w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center rotate-3 shadow-lg shadow-indigo-500/30">
-            <Sparkles className="w-8 h-8 text-white -rotate-3" />
+      <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-zinc-50 dark:bg-zinc-950 p-4">
+        {/* Background Effects */}
+        <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px]"></div>
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-500/10 via-transparent to-transparent"></div>
+        
+        <div className="max-w-[360px] w-full bg-white/40 dark:bg-zinc-900/40 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/20 dark:border-zinc-800/50 px-8 py-14 text-center space-y-8 relative z-10 group">
+          <div className="mx-auto w-16 h-16 bg-gradient-to-tr from-indigo-600 to-violet-500 rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-500/30 transition-transform duration-700 group-hover:-translate-y-1">
+            <Sparkles className="w-8 h-8 text-white transition-transform duration-1000 group-hover:rotate-[360deg]" />
           </div>
-          <div className="space-y-2">
-            <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">Acesso Restrito</h1>
-            <p className="text-zinc-500 dark:text-zinc-400">Insira a senha master para acessar a plataforma.</p>
+          <div className="space-y-3">
+            <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">Faça o login</h1>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">Insira a senha master para acessar.</p>
           </div>
-          <form onSubmit={handleLogin} className="space-y-4">
+          <form onSubmit={handleLogin} className="space-y-5">
             <input 
               type="password" 
               value={passwordInput} 
               onChange={e => setPasswordInput(e.target.value)} 
-              className="w-full px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 border-none focus:ring-2 focus:ring-indigo-500 dark:text-zinc-100 text-center text-lg tracking-widest placeholder:tracking-normal outline-none"
+              className="w-full px-5 py-4 rounded-xl bg-white/50 dark:bg-zinc-950/50 border border-zinc-200 dark:border-zinc-800 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 dark:text-zinc-100 text-center text-xl tracking-widest placeholder:tracking-normal outline-none transition-all"
               placeholder="••••••••"
               autoFocus
             />
-            <button type="submit" className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-medium transition-colors shadow-lg shadow-indigo-500/25">
-              Entrar no Sistema
+            <button type="submit" className="w-full py-4 bg-zinc-900 hover:bg-zinc-800 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white rounded-xl font-semibold transition-all shadow-md hover:shadow-xl active:scale-[0.98]">
+              Entrar
             </button>
           </form>
         </div>
