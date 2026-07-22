@@ -10,7 +10,7 @@ import {
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { 
-    Plus, Trash2, Wand2, Box, Layers, Loader2, ArrowUpDown, Brain, X, GripVertical, List
+    Plus, Trash2, Wand2, Box, Layers, Loader2, ArrowUpDown, Brain, X, GripVertical, List, ChevronDown, ChevronRight, ChevronUp
 } from "lucide-react";
 import {
     DndContext,
@@ -160,6 +160,13 @@ const AutocompleteDescricaoCell = ({ initialValue, rowIndex, onUpdateRow, onOpen
         if (onOpenChange) onOpenChange(isOpen);
     }, [isOpen, onOpenChange]);
 
+    useEffect(() => {
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
+        }
+    }, [val]);
+
     const handleSearch = async (query: string) => {
         if (!query || query.length < 3) {
             setResults([]);
@@ -277,16 +284,7 @@ const SortableRow = ({ row, virtualRow, data, setData, onOpenCreatorModal, rowVi
     
     const isAutocompleteOpen = activeAutocompleteRowId === row.original.id;
     
-    const [isHovered, setIsHovered] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
-
-    const handleMouseEnter = () => {
-        setIsHovered(true);
-    };
-
-    const handleMouseLeave = () => {
-        setIsHovered(false);
-    };
 
     // O transform do sortable (que move no eixo Y durante o arraste) é somado ao translateY da virtualização
     const style: React.CSSProperties = {
@@ -296,7 +294,7 @@ const SortableRow = ({ row, virtualRow, data, setData, onOpenCreatorModal, rowVi
             : `translateY(${virtualRow.start}px)`,
         transition: transition || undefined,
         // Força z-index alto quando o autocomplete está aberto ou quando a linha tem hover/focus, para não ser coberta por irmãos virtuais
-        zIndex: isDragging ? 999 : (isAutocompleteOpen ? 900 : (isHovered || isFocused ? 80 : 10)),
+        zIndex: isDragging ? 999 : (isAutocompleteOpen ? 900 : undefined),
         opacity: isDragging ? 0.8 : 1,
     };
 
@@ -307,10 +305,8 @@ const SortableRow = ({ row, virtualRow, data, setData, onOpenCreatorModal, rowVi
                 rowVirtualizer.measureElement(node);
             }}
             data-index={virtualRow.index}
-            className={`group transition-colors duration-150 absolute top-0 left-0 w-full flex items-center py-2 ${isHovered ? 'bg-zinc-100 dark:bg-zinc-800/60' : ''} ${row.original.is_macro_item ? 'bg-zinc-100/80 dark:bg-zinc-800/50 border-y border-zinc-200 dark:border-zinc-700/50' : ''}`}
+            className={`group transition-colors duration-150 absolute top-0 left-0 w-full flex items-center py-2 z-10 hover:z-[80] hover:bg-zinc-100 dark:hover:bg-zinc-800/60 focus-within:z-[80] ${row.original.is_macro_item ? 'bg-zinc-100/80 dark:bg-zinc-800/50 border-y border-zinc-200 dark:border-zinc-700/50' : ''}`}
             style={style}
-            onMouseEnter={handleMouseEnter}
-            onMouseLeave={handleMouseLeave}
             onFocus={(e) => {
                 // Ignore focus se for no botão do menu
                 if ((e.target as HTMLElement).closest('.row-menu-btn')) return;
@@ -326,16 +322,17 @@ const SortableRow = ({ row, virtualRow, data, setData, onOpenCreatorModal, rowVi
             }}
         >
             {/* Menu de Contexto */}
-            {!activeAutocompleteRowId && isHovered && !isFocused && (
+            {!activeAutocompleteRowId && !isFocused && (
                 <div 
-                    className="absolute left-10 top-[85%] z-[70] flex justify-center items-center pointer-events-auto shadow-xl rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800"
+                    className="absolute left-10 top-[85%] z-[70] hidden group-hover:flex justify-center items-center pointer-events-auto shadow-xl rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800"
                 >
                     <div className="flex flex-row items-center p-1 gap-1 h-9">
                     
                     <button 
                         onClick={() => {
+                            const originalIdx = data.findIndex((d: any) => d.id === row.original.id);
                             const newData = [...data];
-                            newData.splice(virtualRow.index + 1, 0, {id: `macro_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, item: "-", codigo: "", base: "", descricao: "Novo Item", und: "-", quant: 0, valorUnit: 0, total: 0, is_macro_item: true, level: row.original.level});
+                            newData.splice(originalIdx + 1, 0, {id: `macro_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`, item: "-", codigo: "", base: "", descricao: "Novo Item", und: "-", quant: 0, valorUnit: 0, total: 0, is_macro_item: true, level: row.original.level});
                             setData(recalculateNumbers(newData));
                         }}
                         className="row-menu-btn flex flex-row items-center justify-center px-2 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors gap-1.5 h-full">
@@ -345,8 +342,9 @@ const SortableRow = ({ row, virtualRow, data, setData, onOpenCreatorModal, rowVi
 
                     <button 
                         onClick={() => {
+                            const originalIdx = data.findIndex((d: any) => d.id === row.original.id);
                             const newData = [...data];
-                            newData.splice(virtualRow.index + 1, 0, {id: `serv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, item: "-", codigo: "", base: "SINAPI", descricao: "Novo Serviço", und: "-", quant: 1, valorUnit: 0, total: 0, is_macro_item: false, level: (row.original.level || 0) + (row.original.is_macro_item ? 1 : 0)});
+                            newData.splice(originalIdx + 1, 0, {id: `serv_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`, item: "-", codigo: "", base: "SINAPI", descricao: "Novo Serviço", und: "-", quant: 1, valorUnit: 0, total: 0, is_macro_item: false, level: (row.original.level || 0) + (row.original.is_macro_item ? 1 : 0)});
                             setData(recalculateNumbers(newData));
                         }}
                         className="row-menu-btn flex flex-row items-center justify-center px-2 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-700 rounded text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors gap-1.5 h-full">
@@ -360,10 +358,11 @@ const SortableRow = ({ row, virtualRow, data, setData, onOpenCreatorModal, rowVi
                         <>
                             <button 
                                 onClick={() => {
+                                    const originalIdx = data.findIndex((d: any) => d.id === row.original.id);
                                     const newData = [...data];
-                                    const currentLvl = newData[virtualRow.index].level || 0;
+                                    const currentLvl = newData[originalIdx].level || 0;
                                     if (currentLvl > 0) {
-                                        newData[virtualRow.index] = { ...newData[virtualRow.index], level: currentLvl - 1 };
+                                        newData[originalIdx] = { ...newData[originalIdx], level: currentLvl - 1 };
                                         setData(recalculateNumbers(newData));
                                     }
                                 }}
@@ -375,10 +374,11 @@ const SortableRow = ({ row, virtualRow, data, setData, onOpenCreatorModal, rowVi
 
                             <button 
                                 onClick={() => {
+                                    const originalIdx = data.findIndex((d: any) => d.id === row.original.id);
                                     const newData = [...data];
-                                    const currentLvl = newData[virtualRow.index].level || 0;
+                                    const currentLvl = newData[originalIdx].level || 0;
                                     if (currentLvl < 5) {
-                                        newData[virtualRow.index] = { ...newData[virtualRow.index], level: currentLvl + 1 };
+                                        newData[originalIdx] = { ...newData[originalIdx], level: currentLvl + 1 };
                                         setData(recalculateNumbers(newData));
                                     }
                                 }}
@@ -392,7 +392,10 @@ const SortableRow = ({ row, virtualRow, data, setData, onOpenCreatorModal, rowVi
                     )}
 
                     <button 
-                        onClick={() => onOpenCreatorModal && onOpenCreatorModal(row.original.descricao, virtualRow.index)}
+                        onClick={() => {
+                            const originalIdx = data.findIndex((d: any) => d.id === row.original.id);
+                            if (onOpenCreatorModal) onOpenCreatorModal(row.original.descricao, originalIdx);
+                        }}
                         className="row-menu-btn flex flex-row items-center justify-center px-2 py-1 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 rounded text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors gap-1.5 h-full"
                         title="Criar Composição Inédita baseada nesta linha"
                     >
@@ -417,12 +420,88 @@ const SortableRow = ({ row, virtualRow, data, setData, onOpenCreatorModal, rowVi
             
             <div className="flex flex-1 w-full relative">
                 <div 
-                    {...attributes} 
-                    {...listeners} 
-                    className="absolute left-1 top-0 h-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing z-50 text-zinc-400 hover:text-indigo-500"
-                    title="Arrastar e Soltar"
+                    className="absolute left-1 top-1/2 -translate-y-1/2 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-colors z-50 w-6 py-1 rounded-md text-indigo-400/50 hover:text-indigo-400 hover:bg-indigo-500/10"
                 >
-                    <GripVertical className="w-4 h-4" />
+                    <button 
+                       onClick={() => {
+                           const originalIdx = data.findIndex((d: any) => d.id === row.original.id);
+                           if (originalIdx <= 0) return;
+                           const item = data[originalIdx];
+                           const lvl = item.level ?? 0;
+                           let myBlockEnd = originalIdx;
+                           if (item.is_macro_item) {
+                               for (let i = originalIdx + 1; i < data.length; i++) {
+                                   if ((data[i].level ?? 0) <= lvl) break;
+                                   myBlockEnd = i;
+                               }
+                           }
+                           const myBlockSize = myBlockEnd - originalIdx + 1;
+                           let targetIndex = -1;
+                           for (let i = originalIdx - 1; i >= 0; i--) {
+                               if ((data[i].level ?? 0) <= lvl) {
+                                   targetIndex = i;
+                                   break;
+                               }
+                           }
+                           if (targetIndex !== -1) {
+                               const newData = [...data];
+                               const block = newData.splice(originalIdx, myBlockSize);
+                               newData.splice(targetIndex, 0, ...block);
+                               setData(recalculateNumbers(newData));
+                           }
+                       }}
+                       className="hover:text-indigo-600 dark:hover:text-indigo-300 p-0 text-inherit cursor-pointer transition-colors"
+                       title="Mover Bloco para Cima"
+                    ><ChevronUp className="w-3 h-3" /></button>
+                    <div 
+                        {...attributes} 
+                        {...listeners} 
+                        className="cursor-grab active:cursor-grabbing hover:text-indigo-600 dark:hover:text-indigo-300 p-0 py-0.5 text-inherit transition-colors"
+                        title="Arrastar e Soltar"
+                    >
+                        <GripVertical className="w-3 h-3" />
+                    </div>
+                    <button 
+                       onClick={() => {
+                           const originalIdx = data.findIndex((d: any) => d.id === row.original.id);
+                           if (originalIdx === -1) return;
+                           const item = data[originalIdx];
+                           const lvl = item.level ?? 0;
+                           let myBlockEnd = originalIdx;
+                           if (item.is_macro_item) {
+                               for (let i = originalIdx + 1; i < data.length; i++) {
+                                   if ((data[i].level ?? 0) <= lvl) break;
+                                   myBlockEnd = i;
+                               }
+                           }
+                           const myBlockSize = myBlockEnd - originalIdx + 1;
+                           let targetIndex = -1;
+                           for (let i = myBlockEnd + 1; i < data.length; i++) {
+                               if ((data[i].level ?? 0) <= lvl) {
+                                   let targetBlockEnd = i;
+                                   if (data[i].is_macro_item) {
+                                       for (let j = i + 1; j < data.length; j++) {
+                                           if ((data[j].level ?? 0) <= lvl) break;
+                                           targetBlockEnd = j;
+                                       }
+                                   }
+                                   targetIndex = targetBlockEnd + 1;
+                                   break;
+                               }
+                           }
+                           if (targetIndex === -1 && myBlockEnd < data.length - 1) {
+                               targetIndex = data.length;
+                           }
+                           if (targetIndex !== -1) {
+                               const newData = [...data];
+                               const block = newData.splice(originalIdx, myBlockSize);
+                               newData.splice(targetIndex - myBlockSize, 0, ...block);
+                               setData(recalculateNumbers(newData));
+                           }
+                       }}
+                       className="hover:text-indigo-600 dark:hover:text-indigo-300 p-0 text-inherit cursor-pointer transition-colors"
+                       title="Mover Bloco para Baixo"
+                    ><ChevronDown className="w-3 h-3" /></button>
                 </div>
                 {row.getVisibleCells().map((cell: any) => (
                     <div key={cell.id} style={{ width: cell.column.getSize(), flexGrow: cell.column.id === 'descricao' ? 1 : 0 }} className="px-3 shrink-0 flex items-center">
@@ -443,6 +522,44 @@ export function BudgetTable({
   const [sorting, setSorting] = useState<SortingState>([]);
   const [memoryModalData, setMemoryModalData] = useState<{ matches: any[], rowIndex: number, legado: string } | null>(null);
 
+  const [collapsedRows, setCollapsedRows] = useState<Set<string>>(new Set());
+  
+  const toggleCollapse = (id: string) => {
+      setCollapsedRows(prev => {
+          const newSet = new Set(prev);
+          if (newSet.has(id)) newSet.delete(id);
+          else newSet.add(id);
+          return newSet;
+      });
+  };
+
+  const visibleData = React.useMemo(() => {
+      let hiddenUntilLevel = -1;
+      return data.filter((item) => {
+          if (hiddenUntilLevel !== -1) {
+              if (item.level! <= hiddenUntilLevel) {
+                  hiddenUntilLevel = -1;
+              } else {
+                  return false;
+              }
+          }
+          if (item.is_macro_item && collapsedRows.has(item.id)) {
+              hiddenUntilLevel = item.level!;
+          }
+          return true;
+      });
+  }, [data, collapsedRows]);
+
+  const handleUpdateData = React.useCallback((id: string, columnId: string, value: any) => {
+      const idx = data.findIndex(d => d.id === id);
+      if (idx !== -1) updateData(idx, columnId, value);
+  }, [data, updateData]);
+  
+  const handleUpdateRow = React.useCallback((id: string, newRowData: Partial<BudgetItem>) => {
+      const idx = data.findIndex(d => d.id === id);
+      if (idx !== -1) updateRow(idx, newRowData);
+  }, [data, updateRow]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
         if (e.key === 'Escape' && memoryModalData) {
@@ -459,21 +576,35 @@ export function BudgetTable({
     columnHelper.accessor("item", { 
         header: "Item", 
         size: 90,
-        cell: info => (
-            <div className={`flex items-center justify-center w-full h-full pl-5 truncate ${info.row.original.is_macro_item ? 'text-zinc-900 dark:text-zinc-100 font-bold' : 'text-zinc-700 dark:text-zinc-300 font-semibold'}`}>
-                {info.getValue()}
-            </div>
-        )
+        cell: info => {
+            const isMacro = info.row.original.is_macro_item;
+            const isCollapsed = (info.table.options.meta as any)?.collapsedRows?.has(info.row.original.id);
+            const toggle = (info.table.options.meta as any)?.toggleCollapse;
+            
+            return (
+                <div 
+                    className={`flex items-center w-full h-full truncate ${isMacro ? 'text-zinc-900 dark:text-zinc-100 font-bold cursor-pointer hover:text-indigo-600 pl-3' : 'text-zinc-700 dark:text-zinc-300 font-semibold pl-[1.6rem]'}`}
+                    onClick={isMacro ? () => toggle(info.row.original.id) : undefined}
+                >
+                    {isMacro && (
+                        <span className="mr-1 text-zinc-400">
+                            {isCollapsed ? <ChevronRight className="w-4 h-4 inline" /> : <ChevronDown className="w-4 h-4 inline" />}
+                        </span>
+                    )}
+                    {info.getValue()}
+                </div>
+            );
+        }
     }),
     columnHelper.accessor("codigo", { 
         header: "Código", 
         size: 100,
-        cell: info => info.row.original.is_macro_item ? <div className="text-center"></div> : <CodigoCell initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'codigo', v)} />
+        cell: info => info.row.original.is_macro_item ? <div className="text-center"></div> : <CodigoCell initialValue={info.getValue()} onUpdate={(v:any) => (info.table.options.meta as any)?.handleUpdateData(info.row.original.id, 'codigo', v)} />
     }),
     columnHelper.accessor("base", { 
         header: "Base", 
         size: 80,
-        cell: info => info.row.original.is_macro_item ? <div className="text-center"></div> : <CellInput initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'base', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 outline-none px-1 rounded text-center" />
+        cell: info => info.row.original.is_macro_item ? <div className="text-center"></div> : <CellInput initialValue={info.getValue()} onUpdate={(v:any) => (info.table.options.meta as any)?.handleUpdateData(info.row.original.id, 'base', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 outline-none px-1 rounded text-center" />
     }),
     columnHelper.accessor("descricao", { 
         header: "Descrição do Serviço",
@@ -487,7 +618,7 @@ export function BudgetTable({
             if (info.row.original.is_macro_item) {
                 return (
                     <div className="w-full px-2" style={indentStyle}>
-                        <CellInput initialValue={info.getValue()} onUpdate={(v:any) => (info.table.options.meta as any)?.updateRow(info.row.index, {descricao: v})} className="w-full bg-transparent font-bold text-zinc-900 dark:text-zinc-100 truncate outline-none" />
+                        <CellInput initialValue={info.getValue()} onUpdate={(v:any) => (info.table.options.meta as any)?.handleUpdateRow(info.row.original.id, {descricao: v})} className="w-full bg-transparent font-bold text-zinc-900 dark:text-zinc-100 truncate outline-none" />
                     </div>
                 );
             }
@@ -498,8 +629,8 @@ export function BudgetTable({
                         <AutocompleteDescricaoCell 
                             initialValue={info.getValue()} 
                             rowIndex={info.row.index}
-                            onUpdateRow={(newRowData: any) => (info.table.options.meta as any)?.updateRow(info.row.index, newRowData)}
-                            onOpenChange={(info.table.options.meta as any)?.setAutocompleteOpen ? (isOpen: boolean) => (info.table.options.meta as any)?.setAutocompleteOpen(isOpen ? info.row.id : null) : undefined}
+                            onUpdateRow={(newRowData: any) => (info.table.options.meta as any)?.handleUpdateRow(info.row.original.id, newRowData)}
+                            onOpenChange={(info.table.options.meta as any)?.setAutocompleteOpen ? (isOpen: boolean) => (info.table.options.meta as any)?.setAutocompleteOpen(isOpen ? info.row.original.id : null) : undefined}
                         />
                     </div>
                     {hasMemory && (
@@ -568,17 +699,17 @@ export function BudgetTable({
     columnHelper.accessor("und", { 
         header: "Und", 
         size: 60,
-        cell: info => info.row.original.is_macro_item ? <div className="text-center"></div> : <CellInput initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'und', v)} className="w-full bg-transparent text-zinc-400 dark:text-zinc-500 outline-none px-1 rounded text-center" />
+        cell: info => info.row.original.is_macro_item ? <div className="text-center"></div> : <CellInput initialValue={info.getValue()} onUpdate={(v:any) => (info.table.options.meta as any)?.handleUpdateData(info.row.original.id, 'und', v)} className="w-full bg-transparent text-zinc-400 dark:text-zinc-500 outline-none px-1 rounded text-center" />
     }),
     columnHelper.accessor("quant", { 
         header: "Quant.", 
         size: 90,
-        cell: info => info.row.original.is_macro_item ? <div className="text-center"></div> : <CellInput type="number" step="0.01" initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'quant', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 outline-none px-1 rounded text-center" />
+        cell: info => info.row.original.is_macro_item ? <div className="text-center"></div> : <CellInput type="number" step="0.01" initialValue={info.getValue()} onUpdate={(v:any) => (info.table.options.meta as any)?.handleUpdateData(info.row.original.id, 'quant', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 outline-none px-1 rounded text-center" />
     }),
     columnHelper.accessor("valorUnit", { 
         header: "Valor Unit", 
         size: 110,
-        cell: info => info.row.original.is_macro_item ? <div className="text-center"></div> : <CellInput type="number" step="0.01" initialValue={info.getValue()} onUpdate={(v:any) => updateData(info.row.index, 'valorUnit', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 outline-none px-1 rounded text-center" />
+        cell: info => info.row.original.is_macro_item ? <div className="text-center"></div> : <CellInput type="number" step="0.01" initialValue={info.getValue()} onUpdate={(v:any) => (info.table.options.meta as any)?.handleUpdateData(info.row.original.id, 'valorUnit', v)} className="w-full bg-transparent text-zinc-700 dark:text-zinc-300 outline-none px-1 rounded text-center" />
     }),
     columnHelper.display({
         id: "valorUnitBdi",
@@ -608,7 +739,7 @@ export function BudgetTable({
   const [activeAutocompleteRowId, setActiveAutocompleteRowId] = useState<string | null>(null);
 
   const table = useReactTable({
-    data,
+    data: visibleData,
     columns,
     state: { sorting },
     onSortingChange: setSorting,
@@ -618,6 +749,10 @@ export function BudgetTable({
     getRowId: row => row.id,
     meta: {
         updateRow,
+        handleUpdateData,
+        handleUpdateRow,
+        collapsedRows,
+        toggleCollapse,
         setMemoryModalData,
         setAutocompleteOpen: setActiveAutocompleteRowId
     }

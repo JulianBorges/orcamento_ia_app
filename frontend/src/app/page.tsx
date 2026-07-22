@@ -23,6 +23,8 @@ const excelRowSchema = z.object({
 
 export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showCreatorModal, setShowCreatorModal] = useState(false);
   const [showFlatListModal, setShowFlatListModal] = useState(false);
@@ -41,7 +43,22 @@ export default function Home() {
 
   useEffect(() => {
     setIsMounted(true);
+    if (sessionStorage.getItem("orcia_auth") === "true") {
+        setIsAuthenticated(true);
+    }
   }, []);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwordInput === (process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "admin123")) {
+      setIsAuthenticated(true);
+      sessionStorage.setItem("orcia_auth", "true");
+    } else {
+      alert("Senha incorreta!");
+    }
+  };
+
+
 
   // Efeito Dominó (Fila Global)
   useEffect(() => {
@@ -477,6 +494,35 @@ export default function Home() {
 
   if (!isMounted) {
     return null; // Evita Hydration Mismatch
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950 p-4">
+        <div className="max-w-md w-full bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 p-8 text-center space-y-6">
+          <div className="mx-auto w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center rotate-3 shadow-lg shadow-indigo-500/30">
+            <Sparkles className="w-8 h-8 text-white -rotate-3" />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50">Acesso Restrito</h1>
+            <p className="text-zinc-500 dark:text-zinc-400">Insira a senha master para acessar a plataforma.</p>
+          </div>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <input 
+              type="password" 
+              value={passwordInput} 
+              onChange={e => setPasswordInput(e.target.value)} 
+              className="w-full px-4 py-3 rounded-xl bg-zinc-100 dark:bg-zinc-800 border-none focus:ring-2 focus:ring-indigo-500 dark:text-zinc-100 text-center text-lg tracking-widest placeholder:tracking-normal outline-none"
+              placeholder="••••••••"
+              autoFocus
+            />
+            <button type="submit" className="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-medium transition-colors shadow-lg shadow-indigo-500/25">
+              Entrar no Sistema
+            </button>
+          </form>
+        </div>
+      </div>
+    );
   }
 
   return (
