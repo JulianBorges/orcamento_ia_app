@@ -198,7 +198,7 @@ export function CompositionCreatorModal({ isOpen, initialQuery = '', onClose, on
                             <div className="bg-indigo-500/10 border border-indigo-500/20 p-4 rounded-lg flex gap-3 items-start">
                                 <Sparkles className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
                                 <div>
-                                    <h4 className="text-sm font-semibold text-indigo-300 mb-1">Auditoria dos Agentes IA</h4>
+                                    <h4 className="text-sm font-semibold text-indigo-300 mb-1">Parecer da IA</h4>
                                     <p className="text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed">
                                         {result.justificativa}
                                     </p>

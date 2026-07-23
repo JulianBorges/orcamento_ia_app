@@ -58,7 +58,7 @@ async def processar_real_ai(item: StatelessBatchItem, vector: list = None):
     busca_contextualizada = f"Etapa: {item.macro_etapa_pai} -> Serviço: {descricao_pesquisa}" if getattr(item, "macro_etapa_pai", "") else descricao_pesquisa
         
     try:
-        matches = await buscar_verdadeiro_hibrido_async(busca_contextualizada, top_k=7, vector=vector)
+        matches = await buscar_verdadeiro_hibrido_async(busca_contextualizada, top_k=10, vector=vector)
         if not matches or matches[0]['score'] < 0.3:
             memoria_calculo = []
             for m in (matches or []):

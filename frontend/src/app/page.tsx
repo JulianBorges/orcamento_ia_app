@@ -487,8 +487,8 @@ export default function Home() {
           quant: creatorTargetRowIndex !== null ? tableData[creatorTargetRowIndex].quant : 1.0,
           valorUnit: composicao.valor_total_composicao,
           total: composicao.valor_total_composicao * (creatorTargetRowIndex !== null ? tableData[creatorTargetRowIndex].quant : 1.0),
-          ai_status: 'ACEITO',
-          ai_justificativa: `Composição Inédita Gerada por IA baseada na requisição: "${originalQuery}".\n\nAuditoria: ${composicao.justificativa}`
+          ai_status: creatorTargetRowIndex !== null ? 'SUBSTITUIDO' : 'SUBSTITUIDO', // Força SUBSTITUIDO para aparecer na cor certa e ativar o card de justificativa na interface
+          ai_justificativa: `Composição Inédita Gerada por IA baseada na requisição: "${originalQuery}".\n\nParecer da IA: ${composicao.justificativa}`
       };
 
       if (creatorTargetRowIndex !== null) {

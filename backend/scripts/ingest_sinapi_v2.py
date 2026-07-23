@@ -7,7 +7,7 @@ from openai import OpenAI
 import json
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), '.env')
+env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env')
 load_dotenv(env_path)
 
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
@@ -53,10 +53,18 @@ def load_data():
     df_precos = df_precos.dropna(subset=['codigo_composicao'])
     df_precos['codigo_composicao'] = df_precos['codigo_composicao'].astype(str).str.strip().str.replace('.0', '')
     
-    return df_analitica, df_precos
+    df_insumos = pd.read_excel(
+        os.path.join(base_path, 'SINAPI_Insumos_Sem-Desoneracao_RS.xlsx'),
+        skiprows=10,
+        names=['classificacao', 'codigo_insumo', 'descricao', 'unidade', 'origem', 'preco']
+    )
+    df_insumos = df_insumos.dropna(subset=['codigo_insumo', 'preco'])
+    df_insumos['codigo_insumo'] = df_insumos['codigo_insumo'].astype(str).str.strip().str.replace('.0', '')
+    
+    return df_analitica, df_precos, df_insumos
 
-def prepare_documents(df_analitica, df_precos):
-    print("Mesclando inteligência e gerando documentos...")
+def prepare_documents(df_analitica, df_precos, df_insumos):
+    print("Mesclando inteligência e gerando documentos de composições...")
     composicoes = {}
     for _, row in df_analitica.iterrows():
         cod = row['codigo_composicao']
@@ -68,7 +76,6 @@ def prepare_documents(df_analitica, df_precos):
                 "itens": []
             }
         
-        # Atualiza a descrição e unidade baseada na linha mestra se encontrada no analitico
         if str(row['tipo_item']).strip().upper() == 'COMPOSIÇÃO' and str(row['codigo_item']).strip() == cod:
             composicoes[cod]["descricao_servico"] = str(row['descricao']).strip()
             composicoes[cod]["unidade"] = str(row['unidade']).strip()
@@ -102,11 +109,12 @@ def prepare_documents(df_analitica, df_precos):
             texto_busca += f"- {item['tipo']}: {item['descricao']} (Cód: {item['codigo_item']}) | Coeficiente: {item['coeficiente']} {item['unidade']}\n"
             
         metadata = {
+            "tipo": "composicao",
             "codigo": cod,
             "descricao": comp["descricao_servico"],
             "unidade": comp["unidade"],
             "custo": custo,
-            "json_composicao": json.dumps(comp["itens"], ensure_ascii=False)[:30000] # Limite de metadados do Pinecone
+            "json_composicao": json.dumps(comp["itens"], ensure_ascii=False)[:30000]
         }
         
         documents.append({
@@ -115,10 +123,34 @@ def prepare_documents(df_analitica, df_precos):
             "metadata": metadata
         })
         
+    print("Gerando documentos de insumos...")
+    for _, row in df_insumos.iterrows():
+        cod = row['codigo_insumo']
+        desc = str(row['descricao']).strip()
+        und = str(row['unidade']).strip()
+        custo = float(row['preco']) if pd.notna(row['preco']) else 0.0
+        
+        texto_busca = f"INSUMO SINAPI: {cod} - {desc}\nUnidade: {und}\nCusto (Sem Desoneração): R$ {custo:.2f}"
+        
+        metadata = {
+            "tipo": "insumo",
+            "codigo": cod,
+            "descricao": desc,
+            "unidade": und,
+            "custo": custo,
+            "json_composicao": "[]"
+        }
+        
+        documents.append({
+            "id": f"insumo_{cod}",
+            "text": texto_busca,
+            "metadata": metadata
+        })
+        
     return documents
 
 def generate_embeddings_and_upload(documents):
-    print(f"Gerando embeddings e subindo para Pinecone ({len(documents)} composições)...")
+    print(f"Gerando embeddings e subindo para Pinecone ({len(documents)} vetores no total)...")
     index = pc.Index(INDEX_NAME)
     
     batch_size = 50
@@ -137,13 +169,13 @@ def generate_embeddings_and_upload(documents):
             })
             
         index.upsert(vectors=vectors, namespace=NAMESPACE)
-        print(f"Lote {i//batch_size + 1}/{(len(documents)//batch_size)+1} concluído.")
+        if (i // batch_size + 1) % 10 == 0:
+            print(f"Lote {i//batch_size + 1}/{(len(documents)//batch_size)+1} concluído.")
         
-    print("SUCESSO: Todas as Composições Analíticas do SINAPI foram indexadas!")
+    print("SUCESSO: Todas as Composições e Insumos SINAPI foram indexados!")
 
 if __name__ == "__main__":
     recreate_index()
-    df_a, df_p = load_data()
-    docs = prepare_documents(df_a, df_p)
-    # Limite removido. O banco inteiro será enviado.
+    df_a, df_p, df_i = load_data()
+    docs = prepare_documents(df_a, df_p, df_i)
     generate_embeddings_and_upload(docs)

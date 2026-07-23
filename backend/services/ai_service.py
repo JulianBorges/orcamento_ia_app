@@ -139,7 +139,13 @@ async def buscar_semelhantes_pinecone_async(descricao: str, top_k: int = 15, vec
     loop = asyncio.get_event_loop()
     query_response = await loop.run_in_executor(
         None, 
-        lambda: index.query(vector=vector, top_k=100, include_metadata=True, namespace="composicoes_sinapi")
+        lambda: index.query(
+            vector=vector, 
+            top_k=100, 
+            include_metadata=True, 
+            namespace="composicoes_sinapi",
+            filter={"tipo": "composicao"}
+        )
     )
     
     # Converte o ScoredVector do Pinecone para dict nativo do Python para não dar erro de TypeError no unpacking (**)
@@ -295,7 +301,38 @@ async def agente_pesquisador_composicoes(descricao: str, top_k: int = 5):
     loop = asyncio.get_event_loop()
     query_response = await loop.run_in_executor(
         None, 
-        lambda: index_v2.query(vector=vector, top_k=top_k, include_metadata=True, namespace="composicoes_sinapi")
+        lambda: index_v2.query(
+            vector=vector, 
+            top_k=top_k, 
+            include_metadata=True, 
+            namespace="composicoes_sinapi",
+            filter={"tipo": "composicao"}
+        )
+    )
+    
+    semantic_cache[cache_key] = query_response['matches']
+    return query_response['matches']
+
+async def agente_pesquisador_insumos(descricao: str, top_k: int = 15):
+    """Busca no Pinecone por Insumos SINAPI relevantes ao serviço."""
+    cache_key = f"insumos_{descricao}_{top_k}"
+    if cache_key in semantic_cache:
+        return semantic_cache[cache_key]
+        
+    res = await async_openai_client.embeddings.create(model="text-embedding-3-small", input=descricao)
+    vector = res.data[0].embedding
+    
+    index_v2 = pc.Index("orcamento-engenharia")
+    loop = asyncio.get_event_loop()
+    query_response = await loop.run_in_executor(
+        None, 
+        lambda: index_v2.query(
+            vector=vector, 
+            top_k=top_k, 
+            include_metadata=True, 
+            namespace="composicoes_sinapi",
+            filter={"tipo": "insumo"}
+        )
     )
     
     semantic_cache[cache_key] = query_response['matches']
@@ -308,15 +345,27 @@ async def gerar_composicao_agentes_async(servico: str) -> dict:
     from models.schemas import ComposicaoGerada
     
     # 1. Agente Pesquisador (Recupera Conhecimento)
-    referencias = await agente_pesquisador_composicoes(servico)
-    refs_texto = "\n\n".join([f"REF {i+1}: {m['metadata'].get('descricao')}\nJSON Base: {m['metadata'].get('json_composicao')}" for i, m in enumerate(referencias)])
+    # Busca Composições e Insumos em paralelo para ganho de performance
+    referencias, insumos_catalogo = await asyncio.gather(
+        agente_pesquisador_composicoes(servico, top_k=5),
+        agente_pesquisador_insumos(servico, top_k=15)
+    )
+    
+    refs_texto = "=== COMPOSIÇÕES DE REFERÊNCIA SINAPI ===\n" + "\n\n".join([f"REF {i+1}: {m['metadata'].get('descricao')}\nJSON Base: {m['metadata'].get('json_composicao')}" for i, m in enumerate(referencias)])
+    
+    insumos_texto = "\n\n=== CATÁLOGO DE INSUMOS SINAPI DISPONÍVEIS ===\n" + "\n".join([
+        f"- Cód: {m['metadata'].get('codigo')} | {m['metadata'].get('descricao')} | Un: {m['metadata'].get('unidade')} | Preço: R$ {m['metadata'].get('custo'):.2f}"
+        for m in insumos_catalogo
+    ])
+    
+    contexto_completo = f"{refs_texto}\n{insumos_texto}"
     
     # 2. Agente Engenheiro (Rascunha a CPU)
     completion_eng = await async_openai_client.beta.chat.completions.parse(
         model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT_ENGENHEIRO},
-            {"role": "user", "content": f"SERVIÇO SOLICITADO: {servico}\n\nREFERÊNCIAS SINAPI ENCONTRADAS:\n{refs_texto}"}
+            {"role": "user", "content": f"SERVIÇO SOLICITADO: {servico}\n\n{contexto_completo}"}
         ],
         response_format=ComposicaoGerada,
     )
