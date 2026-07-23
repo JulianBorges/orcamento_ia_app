@@ -31,7 +31,6 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useBudgetStore } from '@/store/useBudgetStore';
 import { BudgetItem, recalculateNumbers, moveRowOrBlock } from '@/utils/budgetUtils';
-import { MemoryCalculoModal } from "./MemoryCalculoModal";
 import { CompositionDetailsModal } from "./CompositionDetailsModal";
 
 const columnHelper = createColumnHelper<BudgetItem>();
