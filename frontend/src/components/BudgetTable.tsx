@@ -1016,7 +1016,7 @@ export function BudgetTable({
                 isOpen={!!detailsItem} 
                 item={detailsItem} 
                 onClose={() => setDetailsItem(null)} 
-                onSave={(updated) => updateRow(updated.id, updated)} 
+                onSave={(updated) => handleUpdateRow(updated.id, updated)} 
             />
         )}
     </div>
