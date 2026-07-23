@@ -31,6 +31,8 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useBudgetStore } from '@/store/useBudgetStore';
 import { BudgetItem, recalculateNumbers, moveRowOrBlock } from '@/utils/budgetUtils';
+import { MemoryCalculoModal } from "./MemoryCalculoModal";
+import { CompositionDetailsModal } from "./CompositionDetailsModal";
 
 const columnHelper = createColumnHelper<BudgetItem>();
 
@@ -108,10 +110,12 @@ const CellInput = ({ initialValue, onUpdate, type = "text", className = "", step
 
 export interface CodigoCellProps {
     initialValue: string;
+    item: BudgetItem;
     onUpdate: (val: string) => void;
+    onOpenDetails: (item: BudgetItem) => void;
 }
 
-const CodigoCell = ({ initialValue, onUpdate }: CodigoCellProps) => {
+const CodigoCell = ({ initialValue, item, onUpdate, onOpenDetails }: CodigoCellProps) => {
     const [isEditing, setIsEditing] = useState(false);
     const [val, setVal] = useState(initialValue);
 
@@ -143,7 +147,7 @@ const CodigoCell = ({ initialValue, onUpdate }: CodigoCellProps) => {
             onDoubleClick={() => setIsEditing(true)}
             onClick={() => {
                 if (!initialValue || initialValue === '-') return;
-                alert("Abertura detalhada da composição " + initialValue + " (SINAPI ou Própria) em desenvolvimento!");
+                onOpenDetails(item);
             }}
             className="w-full bg-transparent text-blue-400 px-1 rounded cursor-pointer hover:underline decoration-blue-500/50 underline-offset-4 truncate text-center"
             title="Clique para abrir, duplo clique para editar"
@@ -571,6 +575,7 @@ export function BudgetTable({
   const { tableData: data, setTableData: setData, bdi, updateData, updateRow, updateItemPosition } = useBudgetStore();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [memoryModalData, setMemoryModalData] = useState<{ matches: any[], rowIndex: number, legado: string } | null>(null);
+  const [detailsItem, setDetailsItem] = useState<BudgetItem | null>(null);
 
   const [collapsedRows, setCollapsedRows] = useState<Set<string>>(new Set());
   
@@ -649,7 +654,7 @@ export function BudgetTable({
     columnHelper.accessor("codigo", { 
         header: "Código", 
         size: 100,
-        cell: info => info.row.original.is_macro_item ? <div className="text-center"></div> : <CodigoCell initialValue={info.getValue()} onUpdate={(v:any) => (info.table.options.meta as any)?.handleUpdateData(info.row.original.id, 'codigo', v)} />
+        cell: info => info.row.original.is_macro_item ? <div className="text-center"></div> : <CodigoCell initialValue={info.getValue()} item={info.row.original} onOpenDetails={(info.table.options.meta as any)?.handleOpenDetails} onUpdate={(v:any) => (info.table.options.meta as any)?.handleUpdateData(info.row.original.id, 'codigo', v)} />
     }),
     columnHelper.accessor("base", { 
         header: "Base", 
@@ -801,8 +806,10 @@ export function BudgetTable({
         updateRow,
         handleUpdateData,
         handleUpdateRow,
+        updateItemPosition: updateItemPosition,
         collapsedRows,
         toggleCollapse,
+        handleOpenDetails: setDetailsItem,
         setMemoryModalData,
         setAutocompleteOpen: setActiveAutocompleteRowId
     }
@@ -1003,6 +1010,15 @@ export function BudgetTable({
                     </div>
                 </div>
             </div>
+        )}
+
+        {detailsItem && (
+            <CompositionDetailsModal 
+                isOpen={!!detailsItem} 
+                item={detailsItem} 
+                onClose={() => setDetailsItem(null)} 
+                onSave={(updated) => updateRow(updated.id, updated)} 
+            />
         )}
     </div>
   );

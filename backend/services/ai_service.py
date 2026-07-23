@@ -380,7 +380,24 @@ async def gerar_composicao_agentes_async(servico: str) -> dict:
         ],
         response_format=ComposicaoGerada,
     )
-    return completion_rev.choices[0].message.parsed.model_dump()
+    cpu = completion_rev.choices[0].message.parsed
+    
+    # Garantia estrita: o valor unitário deve vir do banco SINAPI, não do LLM.
+    catalogo_map = {str(m['metadata'].get('codigo')): m['metadata'] for m in insumos_catalogo}
+    total_comp = 0.0
+    
+    for item in cpu.itens:
+        meta = catalogo_map.get(str(item.codigo_sinapi))
+        if meta:
+            item.descricao = meta.get('descricao', item.descricao)
+            item.unidade = meta.get('unidade', item.unidade)
+            item.valor_unitario = float(meta.get('custo', item.valor_unitario))
+        
+        item.valor_total = round(item.coeficiente * item.valor_unitario, 2)
+        total_comp += item.valor_total
+        
+    cpu.valor_total_composicao = round(total_comp, 2)
+    return cpu.model_dump()
 
 async def gerar_eap_inteligente_async(request: EAPGenerationRequest) -> dict:
     prompt = """Você é um engenheiro orçamentista sênior. 
@@ -405,3 +422,40 @@ Atenção:
     )
     
     return completion.choices[0].message.parsed.model_dump()
+
+async def buscar_composicao_por_codigo_async(codigo: str) -> dict:
+    """Busca os detalhes de uma composição específica no Pinecone pelo código (SINAPI)."""
+    index_v2 = pc.Index("orcamento-engenharia")
+    loop = asyncio.get_event_loop()
+    
+    # O ID no Pinecone é prefixado com comp_ para composições SINAPI
+    pinecone_id = f"comp_{codigo}"
+    
+    try:
+        response = await loop.run_in_executor(
+            None,
+            lambda: index_v2.fetch(ids=[pinecone_id], namespace="composicoes_sinapi")
+        )
+        
+        matches = response.get('vectors', {})
+        if pinecone_id in matches:
+            vector_data = matches[pinecone_id]
+            metadata = vector_data.get('metadata', {})
+            json_comp = metadata.get('json_composicao', '[]')
+            import json
+            try:
+                itens = json.loads(json_comp)
+            except:
+                itens = []
+                
+            return {
+                "codigo": metadata.get("codigo", codigo),
+                "descricao": metadata.get("descricao", ""),
+                "unidade": metadata.get("unidade", ""),
+                "valor_total_composicao": metadata.get("custo", 0.0),
+                "itens": itens
+            }
+        return None
+    except Exception as e:
+        print(f"Erro ao buscar composição {codigo}: {e}")
+        return None

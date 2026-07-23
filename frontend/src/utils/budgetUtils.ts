@@ -15,6 +15,7 @@ export type BudgetItem = {
   ai_justificativa?: string;
   memoria_calculo?: any[];
   descricao_legada?: string;
+  composicao_detalhada?: any[];
 };
 
 export const recalculateNumbers = (data: BudgetItem[]): BudgetItem[] => {

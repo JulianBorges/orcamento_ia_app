@@ -15,6 +15,18 @@ async def search_sinapi(q: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.get("/composicao/{codigo}")
+async def get_composicao_detalhada(codigo: str):
+    """Busca os itens detalhados de uma composição específica pelo código."""
+    from services.ai_service import buscar_composicao_por_codigo_async
+    try:
+        comp = await buscar_composicao_por_codigo_async(codigo)
+        if not comp:
+            raise HTTPException(status_code=404, detail="Composição não encontrada")
+        return comp
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/orcamento/processar-lote")
 async def processar_lote(request: BatchRequest):
     """Processa dezenas de itens simultaneamente (Assíncrono/Batching)."""

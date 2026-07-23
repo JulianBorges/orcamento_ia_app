@@ -477,18 +477,22 @@ export default function Home() {
   };
 
   const handleAddCustomComposition = (composicao: ComposicaoGerada, originalQuery: string) => {
+      const cpCount = tableData.filter(i => i.base === 'CP' || i.codigo.startsWith('CP_')).length + 1;
+      const cpCode = `CP_${cpCount.toString().padStart(2, '0')}`;
+
       const newItem: BudgetItem = {
           id: creatorTargetRowIndex !== null ? tableData[creatorTargetRowIndex].id : `r_${Date.now()}_custom`,
           item: creatorTargetRowIndex !== null ? tableData[creatorTargetRowIndex].item : `1.${tableData.length + 1}`,
-          codigo: 'IA CUSTOM',
-          base: 'IA CUSTOM',
+          codigo: cpCode,
+          base: 'CP',
           descricao: composicao.servico,
           und: composicao.unidade_medida,
           quant: creatorTargetRowIndex !== null ? tableData[creatorTargetRowIndex].quant : 1.0,
           valorUnit: composicao.valor_total_composicao,
           total: composicao.valor_total_composicao * (creatorTargetRowIndex !== null ? tableData[creatorTargetRowIndex].quant : 1.0),
           ai_status: creatorTargetRowIndex !== null ? 'SUBSTITUIDO' : 'SUBSTITUIDO', // Força SUBSTITUIDO para aparecer na cor certa e ativar o card de justificativa na interface
-          ai_justificativa: `Composição Inédita Gerada por IA baseada na requisição: "${originalQuery}".\n\nParecer da IA: ${composicao.justificativa}`
+          ai_justificativa: `Composição Inédita Gerada por IA baseada na requisição: "${originalQuery}".\n\nParecer da IA: ${composicao.justificativa}`,
+          composicao_detalhada: composicao.itens
       };
 
       if (creatorTargetRowIndex !== null) {
