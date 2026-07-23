@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -44,20 +44,58 @@ export interface CellInputProps {
 }
 
 const CellInput = ({ initialValue, onUpdate, type = "text", className = "", step }: CellInputProps) => {
-    const [val, setVal] = useState(initialValue);
+    const formatValue = (v: any) => {
+        if (type === 'number') {
+            const num = parseFloat(String(v).replace(',', '.'));
+            return isNaN(num) ? "" : num.toFixed(2).replace('.', ',');
+        }
+        return v;
+    };
+
+    const [val, setVal] = useState(formatValue(initialValue));
     
     // Atualiza o estado local se o valor pai mudar (ex: IA injeta novos dados)
     useEffect(() => {
-        setVal(initialValue);
+        setVal(formatValue(initialValue));
     }, [initialValue]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        let newVal = e.target.value;
+        if (type === 'number') {
+            // Permitir apenas números, pontos e vírgulas durante a digitação
+            newVal = newVal.replace(/[^0-9.,]/g, '');
+        }
+        setVal(newVal);
+    };
+
+    const handleBlur = () => {
+        if (type === 'number') {
+            // Pega o valor digitado, aceita ponto ou vírgula como separador decimal
+            // Para evitar bugs com múltiplos pontos (ex: 1.000.50), convertemos a última vírgula em ponto, 
+            // ou assumimos que o formato foi digitado cru
+            let cleanStr = String(val).replace(',', '.');
+            const parts = cleanStr.split('.');
+            if (parts.length > 2) {
+                cleanStr = parts.slice(0, -1).join('') + '.' + parts[parts.length - 1];
+            }
+            const num = parseFloat(cleanStr);
+            const finalNum = isNaN(num) ? 0 : num;
+            
+            onUpdate(finalNum);
+            setVal(finalNum.toFixed(2).replace('.', ','));
+        } else {
+            onUpdate(val);
+        }
+    };
 
     return (
         <input 
-            type={type}
+            type={type === 'number' ? 'text' : type}
+            inputMode={type === 'number' ? 'decimal' : undefined}
             step={step}
             value={val}
-            onChange={e => setVal(e.target.value)}
-            onBlur={() => onUpdate(type === 'number' ? (parseFloat(String(val)) || 0) : val)}
+            onChange={handleChange}
+            onBlur={handleBlur}
             onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === 'Escape') {
                     e.currentTarget.blur();
@@ -132,18 +170,35 @@ const AutocompleteDescricaoCell = ({ initialValue, rowIndex, onUpdateRow, onOpen
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Sincroniza valor inicial e ajusta altura
+    const adjustHeight = useCallback(() => {
+        if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+        }
+    }, []);
+
+    // Sincroniza valor inicial
     useEffect(() => {
         setVal(initialValue);
     }, [initialValue]);
 
     // Ajusta a altura sempre que o valor mudar
     useEffect(() => {
-        if (textareaRef.current) {
-            textareaRef.current.style.height = 'auto';
-            textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-        }
-    }, [val]);
+        adjustHeight();
+    }, [val, adjustHeight]);
+
+    // Ajusta a altura sempre que a largura da coluna mudar (ex: resize manual)
+    useEffect(() => {
+        const el = textareaRef.current;
+        if (!el) return;
+        
+        const observer = new ResizeObserver(() => {
+            adjustHeight();
+        });
+        
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, [adjustHeight]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -160,12 +215,7 @@ const AutocompleteDescricaoCell = ({ initialValue, rowIndex, onUpdateRow, onOpen
         if (onOpenChange) onOpenChange(isOpen);
     }, [isOpen, onOpenChange]);
 
-    useEffect(() => {
-        if (textareaRef.current) {
-            textareaRef.current.style.height = 'auto';
-            textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
-        }
-    }, [val]);
+
 
     const handleSearch = async (query: string) => {
         if (!query || query.length < 3) {
@@ -305,7 +355,7 @@ const SortableRow = ({ row, virtualRow, data, setData, onOpenCreatorModal, rowVi
                 rowVirtualizer.measureElement(node);
             }}
             data-index={virtualRow.index}
-            className={`group transition-colors duration-150 absolute top-0 left-0 w-full flex items-center py-2 z-10 hover:z-[80] hover:bg-zinc-100 dark:hover:bg-zinc-800/60 focus-within:z-[80] ${row.original.is_macro_item ? 'bg-zinc-100/80 dark:bg-zinc-800/50 border-y border-zinc-200 dark:border-zinc-700/50' : ''}`}
+            className={`group transition-colors duration-150 absolute top-0 left-0 w-full flex items-center py-2 z-10 hover:z-[30] hover:bg-zinc-100 dark:hover:bg-zinc-800/60 focus-within:z-[30] ${row.original.is_macro_item ? 'bg-zinc-100/80 dark:bg-zinc-800/50 border-y border-zinc-200 dark:border-zinc-700/50' : ''}`}
             style={style}
             onFocus={(e) => {
                 // Ignore focus se for no botão do menu

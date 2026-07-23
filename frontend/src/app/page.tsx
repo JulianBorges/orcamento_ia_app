@@ -1,6 +1,6 @@
 "use client";
 import { useState, useRef, useMemo, useEffect } from "react";
-import { UploadCloud, Loader2, Plus, Download, Trash2, AlertCircle, Sparkles } from "lucide-react";
+import { UploadCloud, Loader2, Plus, Download, Trash2, AlertCircle, Sparkles, Pause, Play } from "lucide-react";
 import { BudgetTable } from "@/components/BudgetTable";
 import { BudgetItem, recalculateNumbers } from "@/utils/budgetUtils";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -32,6 +32,13 @@ export default function Home() {
   const [creatorInitialQuery, setCreatorInitialQuery] = useState("");
   const [creatorTargetRowIndex, setCreatorTargetRowIndex] = useState<number | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [isPaused, setIsPaused] = useState(false);
+  const isPausedRef = useRef(false);
+
+  const togglePause = () => {
+      setIsPaused(!isPaused);
+      isPausedRef.current = !isPaused;
+  };
 
   const {
     tableData, bdi, title, isProcessing, uploadProgress,
@@ -234,6 +241,10 @@ export default function Home() {
         let completed = 0;
         
         for (let i = 0; i < rows.length; i += chunkSize) {
+            while (isPausedRef.current) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+
             const chunk = rows.slice(i, i + chunkSize).map(item => ({
                 id: item.id,
                 descricao: item.descricao,
@@ -585,11 +596,19 @@ export default function Home() {
 
               {uploadProgress !== null && (
                   <div className="flex items-center gap-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full px-4 py-1.5 shadow-inner">
-                      <Loader2 className="w-4 h-4 text-indigo-400 animate-spin" />
+                      <button 
+                          onClick={togglePause}
+                          className="relative flex items-center justify-center w-6 h-6 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors group focus:outline-none"
+                          title={isPaused ? "Retomar Analise" : "Pausar Analise"}
+                      >
+                          {!isPaused && <Loader2 className="w-4 h-4 text-indigo-400 animate-spin group-hover:opacity-0 transition-opacity absolute" />}
+                          {!isPaused && <Pause className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity absolute" />}
+                          {isPaused && <Play className="w-3.5 h-3.5 text-emerald-500 absolute" />}
+                      </button>
                       <div className="w-32 h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                          <div className="h-full bg-indigo-500 transition-all duration-300 ease-out" style={{ width: `${uploadProgress}%` }}></div>
+                          <div className={`h-full transition-all duration-300 ease-out ${isPaused ? 'bg-zinc-400 dark:bg-zinc-600' : 'bg-indigo-500'}`} style={{ width: `${uploadProgress}%` }}></div>
                       </div>
-                      <span className="text-xs font-medium text-zinc-400 dark:text-zinc-500 dark:text-zinc-400 font-mono">{uploadProgress}%</span>
+                      <span className={`text-xs font-medium font-mono ${isPaused ? 'text-zinc-400' : 'text-indigo-500 dark:text-indigo-400'}`}>{uploadProgress}%</span>
                   </div>
               )}
               
