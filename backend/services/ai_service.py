@@ -22,7 +22,7 @@ semantic_cache = TTLCache(maxsize=1000, ttl=3600)
 
 def get_sqlite_conn():
     db_path = Path(__file__).parent.parent / "sinapi.db"
-    return sqlite3.connect(str(db_path))
+    return sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
 
 # O índice deve existir. Falhamos rápido (Fail-Fast) se houver erro para não mascarar problemas.
 try:

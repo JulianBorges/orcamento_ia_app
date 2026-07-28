@@ -36,8 +36,13 @@ async def process_item_with_semaphore(item: StatelessBatchItem, ai_function, *ar
                 # Considera Rate Limits, Timeouts e problemas de conexão da OpenAI como passíveis de Retry
                 if any(term in erro_str for term in ["429", "rate limit", "502", "503", "timeout", "timed out", "connection", "overloaded"]):
                     if attempt < max_retries - 1:
-                        # Fail-Fast Backoff (1.5s) para não estourar o limite de 10s da Vercel Hobby
-                        await asyncio.sleep(1.5 * (attempt + 1))
+                        wait_time = 1.5 * (attempt + 1)
+                        import re
+                        match = re.search(r'try again in (\d+(?:\.\d+)?)s', erro_str)
+                        if match:
+                            # Adiciona uma margem de segurança de 10%
+                            wait_time = float(match.group(1)) * 1.1
+                        await asyncio.sleep(wait_time)
                         continue
                 return {"id": item.id, "status": "ERRO", "erro": str(e)}
 
