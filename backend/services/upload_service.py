@@ -71,7 +71,8 @@ async def processar_real_ai(item: StatelessBatchItem, vector: list = None):
     busca_contextualizada = f"Etapa: {item.macro_etapa_pai} -> Serviço: {descricao_pesquisa}" if getattr(item, "macro_etapa_pai", "") else descricao_pesquisa
         
     try:
-        matches = await buscar_verdadeiro_hibrido_async(busca_contextualizada, top_k=10, vector=vector)
+        tipo_item = getattr(item, 'tipo_item', 'SERVICO')
+        matches = await buscar_verdadeiro_hibrido_async(busca_contextualizada, top_k=10, vector=vector, tipo_item=tipo_item)
         if not matches or matches[0]['score'] < 0.3:
             memoria_calculo = []
             for m in (matches or []):
@@ -164,7 +165,14 @@ async def processar_lote_stateless_async(itens: list[StatelessBatchItem], job_id
     valid_texts = []
     for it in valid_items:
         # Usa a corrigida se disponível, senão fallback para original
-        desc_enriquecida = correcoes.get(it.id) or it.descricao
+        dados_corrigidos = correcoes.get(it.id)
+        if dados_corrigidos:
+            desc_enriquecida = dados_corrigidos.get("descricao_corrigida") or it.descricao
+            it.tipo_item = dados_corrigidos.get("tipo_item", "SERVICO")
+        else:
+            desc_enriquecida = it.descricao
+            it.tipo_item = "SERVICO"
+            
         it.descricao_enriquecida = desc_enriquecida
         valid_texts.append(desc_enriquecida)
             

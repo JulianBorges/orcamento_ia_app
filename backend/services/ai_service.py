@@ -60,82 +60,60 @@ async def corrigir_descricoes_lote_async(itens: list[dict]) -> dict:
             temperature=0.1
         )
         lote_corrigido = response.choices[0].message.parsed
-        return {item.id: item.descricao_corrigida for item in lote_corrigido.itens}
+        return {
+            item.id: {
+                "descricao_corrigida": item.descricao_corrigida,
+                "tipo_item": item.tipo_item
+            }
+            for item in lote_corrigido.itens
+        }
     except Exception as e:
         print(f"Erro na normalização em lote: {e}")
         return {}
 
-def lexical_reranker(query: str, semantic_matches: list) -> list:
+def apply_rrf(list_pg: list, list_pinecone: list, k: int = 60) -> list:
     """
-    Reranker Lexical: Sobrepõe uma pontuação de match exato por cima do score semântico.
-    Resolve 'A Maldição da Busca Semântica com Números' normalizando as unidades (ex: 50 mm -> 50mm).
+    Reciprocal Rank Fusion (RRF): Funde matematicamente dois rankings independentes.
+    Resolve a limitação de pesos arbitrários, garantindo que itens com match exato (PG)
+    e alta similaridade (Pinecone) subam pro topo organicamente.
     """
-    if not semantic_matches:
-        return []
+    rrf_scores = {}
+    
+    # 1. Pontuação do Ranking Lexical (PostgreSQL)
+    for rank, match in enumerate(list_pg):
+        item_id = match['id']
+        if item_id not in rrf_scores:
+            rrf_scores[item_id] = {'item': match, 'score': 0.0}
+        rrf_scores[item_id]['score'] += 1.0 / (k + rank + 1)
         
-    # 1. Normalização da Query
-    # Remove espaços antes de unidades para padronizar.
-    # Agora suporta decimais e frações. Exemplo: "50 mm" -> "50mm", "1,5 m" -> "1,5m", "3/4 pol" -> "3/4pol"
-    norm_query = query.lower()
-    norm_query = re.sub(r'(\d+(?:[.,/]\d+)?)\s*(mm|cm|m|kg|m2|m3|l|w|v|in|pol|")', r'\1\2', norm_query)
+    # 2. Pontuação do Ranking Semântico (Pinecone)
+    for rank, match in enumerate(list_pinecone):
+        item_id = match['id']
+        if item_id not in rrf_scores:
+            rrf_scores[item_id] = {'item': match, 'score': 0.0}
+        rrf_scores[item_id]['score'] += 1.0 / (k + rank + 1)
+        
+    # 3. Ordenação final e normalização visual
+    sorted_items = sorted(rrf_scores.values(), key=lambda x: x['score'], reverse=True)
     
-    STOP_WORDS = {'de', 'da', 'do', 'das', 'dos', 'em', 'na', 'no', 'nas', 'nos', 'por', 'para', 'com', 'sem', 'a', 'o', 'as', 'os', 'e', 'ou', 'um', 'uma', 'uns', 'umas'}
+    max_score = sorted_items[0]['score'] if sorted_items else 1.0
     
-    # Extrai tokens (palavras) removendo pontuações soltas e stop words
-    raw_tokens = norm_query.split()
-    query_tokens = set(t.strip('.,;:()[]{}!') for t in raw_tokens if t.strip('.,;:()[]{}!') and t.strip('.,;:()[]{}!') not in STOP_WORDS)
-    if not query_tokens:
-        return semantic_matches
+    resultados = []
+    for obj in sorted_items:
+        item = obj['item']
+        # Converte o Score do RRF para a escala 0-1 (percentual p/ UI)
+        item['score'] = min(1.0, obj['score'] / max_score)
+        resultados.append(item)
+        
+    return resultados
 
-    reranked = []
-    for match in semantic_matches:
-        # Pega a descrição do banco e normaliza com a mesma regra
-        desc = match.get('metadata', {}).get('descricao', '').lower()
-        norm_desc = re.sub(r'(\d+(?:[.,/]\d+)?)\s*(mm|cm|m|kg|m2|m3|l|w|v|in|pol|")', r'\1\2', desc)
-        
-        desc_raw_tokens = norm_desc.split()
-        desc_tokens = set(t.strip('.,;:()[]{}!') for t in desc_raw_tokens if t.strip('.,;:()[]{}!') and t.strip('.,;:()[]{}!') not in STOP_WORDS)
-        
-        matches_word = 0
-        matches_number = 0
-        
-        for token in query_tokens:
-            if token in desc_tokens:
-                if any(char.isdigit() for char in token):
-                    matches_number += 1
-                else:
-                    matches_word += 1
-                    
-        # Proporção de acerto das palavras textuais (máximo +0.15)
-        text_tokens_count = len([t for t in query_tokens if not any(c.isdigit() for c in t)])
-        word_ratio = matches_word / text_tokens_count if text_tokens_count > 0 else 0
-        
-        # Bônus para números exatos, crucial na engenharia (máximo +0.30)
-        number_bonus = min(0.30, matches_number * 0.10)
-        
-        # Score Híbrido Proporcional
-        hybrid_score = match['score'] + (word_ratio * 0.15) + number_bonus
-        
-        reranked.append({
-            **match,
-            'hybrid_score': hybrid_score
-        })
-        
-    # Ordena pelo novo Score Híbrido decrescente
-    reranked.sort(key=lambda x: x['hybrid_score'], reverse=True)
-    
-    # Atualiza visualmente o Score para refletir a nova confiança
-    for r in reranked:
-        r['score'] = min(r['hybrid_score'], 1.0) # Cap em 100% no visual
-        del r['hybrid_score']
-        
-    return reranked
-
-async def buscar_semelhantes_pinecone_async(descricao: str, top_k: int = 15, vector: list = None):
-    """Busca assíncrona no Pinecone (via embeddings da OpenAI) com Reranker Lexical."""
+async def buscar_semelhantes_pinecone_async(descricao: str, top_k: int = 15, vector: list = None, tipo_item: str = 'SERVICO'):
+    """Busca assíncrona no Pinecone (via embeddings da OpenAI)."""
     if vector is None:
         res = await async_openai_client.embeddings.create(model="text-embedding-3-small", input=descricao)
         vector = res.data[0].embedding
+    
+    pinecone_filter = "insumo" if tipo_item == 'MATERIAL' else "composicao"
     
     # Busca Ampla Semântica: Traz 100 itens em vez de 15, para não perder nenhum cano.
     loop = asyncio.get_event_loop()
@@ -146,7 +124,7 @@ async def buscar_semelhantes_pinecone_async(descricao: str, top_k: int = 15, vec
             top_k=100, 
             include_metadata=True, 
             namespace="composicoes_sinapi",
-            filter={"tipo": "composicao"}
+            filter={"tipo": pinecone_filter}
         )
     )
     
@@ -157,7 +135,7 @@ async def buscar_semelhantes_pinecone_async(descricao: str, top_k: int = 15, vec
     # Nota: se for chamado diretamente, ele retorna os 100 itens.
     return semantic_matches
 
-async def buscar_pg_async(query: str, top_k: int = 15):
+async def buscar_pg_async(query: str, top_k: int = 15, tipo_item: str = 'SERVICO'):
     """Busca ultra-rápida no PostgreSQL via FTS (Lexical puro)."""
     # Remove pontuações
     query_limpa = re.sub(r'[^\w\s]', ' ', query)
@@ -168,14 +146,15 @@ async def buscar_pg_async(query: str, top_k: int = 15):
     # Monta a query para o plainto_tsquery (token1 & token2...)
     pg_query = " & ".join(tokens)
     
+    tabela = "sinapi_insumos" if tipo_item == 'MATERIAL' else "sinapi_composicoes"
+    
     try:
         conn = await get_pg_conn()
         
-        # A tabela sinapi_composicoes tem o índice GIN na coluna busca_textual
-        rows = await conn.fetch('''
+        rows = await conn.fetch(f'''
             SELECT codigo, descricao, preco, unidade, estado, modalidade,
                    ts_rank(busca_textual, websearch_to_tsquery('portuguese', $1)) as rank
-            FROM sinapi_composicoes
+            FROM {tabela}
             WHERE busca_textual @@ websearch_to_tsquery('portuguese', $1)
             ORDER BY rank DESC
             LIMIT $2
@@ -200,41 +179,26 @@ async def buscar_pg_async(query: str, top_k: int = 15):
         print("Erro PG FTS:", e)
         return []
 
-async def buscar_lexical_pg_async(query: str, top_k: int = 15):
+async def buscar_lexical_pg_async(query: str, top_k: int = 15, tipo_item: str = 'SERVICO'):
     # Chamando o Postgres FTS
-    return await buscar_pg_async(query, top_k)
+    return await buscar_pg_async(query, top_k, tipo_item)
 
-async def buscar_verdadeiro_hibrido_async(descricao: str, top_k: int = 15, vector: list = None):
-    """Busca no Pinecone (Semântico) + PostgreSQL (Lexical) e passa pelo Reranker."""
+async def buscar_verdadeiro_hibrido_async(descricao: str, top_k: int = 15, vector: list = None, tipo_item: str = 'SERVICO'):
+    """Busca no Pinecone (Semântico) + PostgreSQL (Lexical) e passa pelo algoritmo matemático RRF."""
     
     # Verifica cache (apenas se vector for None, que é o caso comum sem batching)
-    cache_key = f"hibrido_{descricao}_{top_k}"
+    cache_key = f"hibrido_{tipo_item}_{descricao}_{top_k}"
     if vector is None and cache_key in semantic_cache:
         return semantic_cache[cache_key]
         
-    # Dispara as duas buscas em paralelo
-    task_pinecone = buscar_semelhantes_pinecone_async(descricao, top_k=50, vector=vector) # Traz 100 por baixo dos panos
-    task_pg = buscar_lexical_pg_async(descricao, top_k=20)
+    # Dispara as duas buscas em paralelo, respeitando o tipo de item
+    task_pinecone = buscar_semelhantes_pinecone_async(descricao, top_k=50, vector=vector, tipo_item=tipo_item)
+    task_pg = buscar_lexical_pg_async(descricao, top_k=20, tipo_item=tipo_item)
     
     res_pinecone, res_pg = await asyncio.gather(task_pinecone, task_pg)
     
-    # Junta resultados removendo duplicadas
-    vistos = set()
-    matches_combinados = []
-    
-    # Prioriza o PG pois são Matches Exatos
-    for m in res_pg:
-        if m['id'] not in vistos:
-            vistos.add(m['id'])
-            matches_combinados.append(m)
-            
-    for m in res_pinecone:
-        if m['id'] not in vistos:
-            vistos.add(m['id'])
-            matches_combinados.append(m)
-            
-    # Aplica o Reranker para dar a nota final misturando Semântica e Lexical
-    hybrid_matches = lexical_reranker(descricao, matches_combinados)
+    # Aplica o RRF (Reciprocal Rank Fusion) para fundir as duas listas
+    hybrid_matches = apply_rrf(res_pg, res_pinecone)
     
     final_result = hybrid_matches[:top_k]
     
@@ -402,7 +366,6 @@ async def gerar_composicao_agentes_async(servico: str) -> dict:
     # Garantia estrita: o valor unitário deve vir do banco SINAPI, não do LLM.
     catalogo_map = {str(m['metadata'].get('codigo')): m['metadata'] for m in insumos_catalogo}
     total_comp = 0.0
-    
     for item in cpu.itens:
         meta = catalogo_map.get(str(item.codigo_sinapi))
         if meta:

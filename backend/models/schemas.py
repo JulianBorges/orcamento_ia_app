@@ -20,6 +20,7 @@ class StatelessBatchItem(BaseModel):
     is_macro_item: Optional[bool] = Field(default=False, description="Indica se é um título/cabeçalho da EAP")
     macro_etapa_pai: Optional[str] = Field(default="", description="Nome do Cabeçalho que este item pertence")
     descricao_enriquecida: Optional[str] = Field(default=None, description="Descrição após correção e expansão léxica pelo Corretor LLM")
+    tipo_item: Optional[str] = Field(default="SERVICO", description="Classificação do item (MATERIAL ou SERVICO)")
 
 class StatelessBatchRequest(BaseModel):
     itens: List[StatelessBatchItem] = Field(description="Lista de itens em lote (chunk) enviados pelo frontend")
@@ -27,9 +28,11 @@ class StatelessBatchRequest(BaseModel):
 class DescricaoCorrigida(BaseModel):
     id: str = Field(description="ID original do item recebido no payload")
     descricao_corrigida: str = Field(description="A descrição corrigida, sem alucinar especificações não existentes")
+    tipo_item: str = Field(description="Classifique como 'MATERIAL' se for um insumo avulso, ou 'SERVICO' se implicar mão de obra ou execução.")
 
 class LoteCorrigido(BaseModel):
     itens: List[DescricaoCorrigida] = Field(description="Lista de itens processados e corrigidos")
+
 
 class ComposicaoRequest(BaseModel):
     servico: str = Field(description="Descrição do serviço para gerar uma composição.")

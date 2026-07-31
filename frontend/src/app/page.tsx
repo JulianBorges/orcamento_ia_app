@@ -23,6 +23,7 @@ export default function Home() {
   const [creatorInitialQuery, setCreatorInitialQuery] = useState("");
   const [creatorTargetRowIndex, setCreatorTargetRowIndex] = useState<number | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [localBdi, setLocalBdi] = useState<string>("0");
 
   const {
     tableData, bdi, title, isProcessing, uploadProgress, processingStatusText, processedItemsCount,
@@ -48,6 +49,20 @@ export default function Home() {
 
   useEffect(() => {
     setIsMounted(true);
+    setLocalBdi(bdi.toString());
+  }, [bdi]);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      const parsed = parseFloat(localBdi);
+      if (!isNaN(parsed) && parsed !== bdi) {
+        setBdi(parsed);
+      }
+    }, 1500); // 1.5s delay (debounce)
+    return () => clearTimeout(timeout);
+  }, [localBdi, bdi, setBdi]); 
+  
+  useEffect(() => {
     if (sessionStorage.getItem("orcia_auth") === "true") {
         setIsAuthenticated(true);
     }
@@ -240,15 +255,15 @@ export default function Home() {
           </div>
           
           <div className="flex items-center gap-6">
-              {tableData.length > 0 && (
+              {tableData.length > 0 && !isProcessing && (
                   <div className="flex items-center gap-6 mr-4 bg-white dark:bg-zinc-800 p-3 rounded-lg border border-zinc-200 dark:border-zinc-700 shadow-sm">
                       <div className="flex flex-col">
                           <span className="text-[10px] uppercase font-bold tracking-wider text-zinc-400 dark:text-zinc-400 mb-0.5">BDI (%)</span>
                           <div className="flex items-center gap-1 bg-transparent rounded px-2 py-1 focus-within:ring-2 focus-within:ring-indigo-500/50">
                               <input 
                                   type="number" 
-                                  value={bdi} 
-                                  onChange={e => setBdi(parseFloat(e.target.value) || 0)}
+                                  value={localBdi} 
+                                  onChange={e => setLocalBdi(e.target.value)}
                                   className="w-14 bg-transparent text-sm font-medium text-zinc-700 dark:text-zinc-300 outline-none text-center"
                                   step="0.1"
                               />
