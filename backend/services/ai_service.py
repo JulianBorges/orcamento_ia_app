@@ -265,13 +265,22 @@ def agente_pesquisador_dossie(opcoes_pinecone: list) -> str:
     
     return "\n".join(linhas)
 
+from services.cache_service import get_semantic_cache, set_semantic_cache
+
 async def fluxo_multi_agentes_mapeamento_async(item_legado, opcoes_pinecone: list) -> AnaliseItem:
-    """Orquestrador do Pipeline de Multi-Agentes para Mapeamento."""
+    """Orquestrador do Pipeline de Multi-Agentes para Mapeamento com Cache Semântico."""
+    
+    # Prepara os dados do legado ricos em contexto para o hash
+    contexto_legado = f"Descrição: {item_legado.descricao}\nUnidade Original: {item_legado.unidade}\nValor Unitário Original: R$ {item_legado.valorUnit}\nQuantidade: {item_legado.quantidade}"
+    
+    # 0. Verificar Cache Semântico
+    cached_result = await get_semantic_cache(contexto_legado)
+    if cached_result:
+        # Reconstruir o objeto AnaliseItem a partir do dict cacheado
+        return AnaliseItem(**cached_result)
+
     # 1. Agente Pesquisador (Constrói o Raio-X do SINAPI)
     dossie_texto = agente_pesquisador_dossie(opcoes_pinecone)
-    
-    # Prepara os dados do legado ricos em contexto
-    contexto_legado = f"Descrição: {item_legado.descricao}\nUnidade Original: {item_legado.unidade}\nValor Unitário Original: R$ {item_legado.valorUnit}\nQuantidade: {item_legado.quantidade}"
     
     # 2. Agente Estimador (Gera a primeira decisão)
     completion_est = await async_openai_client.beta.chat.completions.parse(
@@ -284,6 +293,9 @@ async def fluxo_multi_agentes_mapeamento_async(item_legado, opcoes_pinecone: lis
         max_tokens=800,
     )
     analise_estimador = completion_est.choices[0].message.parsed
+    
+    # Salvar no Cache Semântico para consultas futuras idênticas (15 dias TTL)
+    await set_semantic_cache(contexto_legado, analise_estimador.model_dump())
     
     # Com o novo Motor Híbrido filtrando cirurgicamente as 5 melhores opções,
     # o Agente Revisor se tornou redundante. O Estimador tem precisão suficiente.

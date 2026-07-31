@@ -7,6 +7,7 @@ from typing import Dict, Any
 from services.ai_service import buscar_verdadeiro_hibrido_async, fluxo_multi_agentes_mapeamento_async
 
 from models.schemas import StatelessBatchItem
+from services.cache_service import publish_sse_event
 
 # Semáforo global para concorrência da OpenAI
 # Reduzido para 30 para equilibrar throughput e evitar Rate Limits pesados (Fail-Fast Serverless)
@@ -118,8 +119,8 @@ async def processar_real_ai(item: StatelessBatchItem, vector: list = None):
     except Exception as e:
         return {"id": item.id, "status": "ERRO", "erro": str(e), "quantidade_original": quantidade, "descricao_original": descricao}
 
-async def processar_lote_stateless_async(itens: list[StatelessBatchItem]):
-    """Recebe um lote (chunk) enviado pelo frontend e processa sincronicamente usando batch de embeddings para máxima performance."""
+async def processar_lote_stateless_async(itens: list[StatelessBatchItem], job_id: str = None):
+    """Recebe um lote (chunk) enviado pelo frontend e processa sincronicamente ou em background emitindo SSE."""
     from services.ai_service import async_openai_client
     
     # 1. Filtra itens validos para evitar tokens desnecessários
@@ -190,8 +191,17 @@ async def processar_lote_stateless_async(itens: list[StatelessBatchItem]):
     async def run_task(item):
         vector = embeddings_map.get(item.id)
         res = await process_item_with_semaphore(item, processar_real_ai, vector)
+        
+        if job_id:
+            # Emitir evento SSE
+            await publish_sse_event(job_id, {"type": "item_processed", "data": res})
+            
         return res
 
     tasks = [asyncio.create_task(run_task(it)) for it in itens]
     resultados = await asyncio.gather(*tasks)
+    
+    if job_id:
+        await publish_sse_event(job_id, {"type": "job_completed"})
+        
     return resultados

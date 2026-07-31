@@ -1,8 +1,12 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi.responses import StreamingResponse
 from models.schemas import BatchRequest, ComposicaoRequest, StatelessBatchRequest, EAPGenerationRequest
 from services.ai_service import buscar_verdadeiro_hibrido_async, fluxo_multi_agentes_mapeamento_async, gerar_composicao_agentes_async, gerar_eap_inteligente_async
 from services.upload_service import processar_lote_stateless_async
+from services.cache_service import subscribe_sse_events
 import asyncio
+import uuid
+import json
 
 router = APIRouter()
 
@@ -109,6 +113,39 @@ async def processar_lote(request: BatchRequest):
     resultados = await asyncio.gather(*tarefas)
     
     return {"resultados": resultados}
+
+@router.post("/orcamento/processar-job")
+async def processar_job(request: StatelessBatchRequest, background_tasks: BackgroundTasks):
+    """Enfileira um lote para processamento em background (SSE)."""
+    if not request.itens:
+        raise HTTPException(status_code=400, detail="Lote vazio.")
+        
+    job_id = str(uuid.uuid4())
+    
+    # Adiciona a tarefa em background enviando o job_id para o worker disparar SSE
+    background_tasks.add_task(processar_lote_stateless_async, request.itens, job_id)
+    
+    return {"status": "ENQUEUED", "job_id": job_id}
+
+@router.get("/orcamento/stream/{job_id}")
+async def stream_job(job_id: str):
+    """Endpoint SSE para ouvir atualizações em tempo real do job."""
+    async def event_generator():
+        try:
+            pubsub = await subscribe_sse_events(job_id)
+            async for message in pubsub.listen():
+                if message['type'] == 'message':
+                    data = message['data']
+                    yield f"data: {data}\n\n"
+                    # Se receber evento de job_completed, encerra o generator (corta conexão)
+                    if '"type": "job_completed"' in data:
+                        break
+        except asyncio.CancelledError:
+            pass
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 @router.post("/orcamento/processar-lote-stateless")
 async def processar_lote_stateless(request: StatelessBatchRequest):
