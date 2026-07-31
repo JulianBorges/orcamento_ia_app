@@ -1,9 +1,8 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Request
 from fastapi.responses import StreamingResponse
 from models.schemas import BatchRequest, ComposicaoRequest, StatelessBatchRequest, EAPGenerationRequest
 from services.ai_service import buscar_verdadeiro_hibrido_async, fluxo_multi_agentes_mapeamento_async, gerar_composicao_agentes_async, gerar_eap_inteligente_async
 from services.upload_service import processar_lote_stateless_async
-from services.cache_service import subscribe_sse_events
 import asyncio
 import uuid
 import json
@@ -128,18 +127,42 @@ async def processar_job(request: StatelessBatchRequest, background_tasks: Backgr
     return {"status": "ENQUEUED", "job_id": job_id}
 
 @router.get("/orcamento/stream/{job_id}")
-async def stream_job(job_id: str):
-    """Endpoint SSE para ouvir atualizações em tempo real do job."""
+async def stream_job(job_id: str, request: Request):
+    """Endpoint SSE imune à perda de pacotes, usando Redis Streams e rastreio de Last-Event-ID."""
+    from services.cache_service import read_sse_stream
+    
+    # O navegador injeta este header automaticamente sempre que cai e reconecta
+    last_id = request.headers.get("Last-Event-ID", "0-0")
+    
     async def event_generator():
+        nonlocal last_id
         try:
-            pubsub = await subscribe_sse_events(job_id)
-            async for message in pubsub.listen():
-                if message['type'] == 'message':
-                    data = message['data']
-                    yield f"data: {data}\n\n"
-                    # Se receber evento de job_completed, encerra o generator (corta conexão)
-                    if '"type": "job_completed"' in data:
-                        break
+            while True:
+                # O read bloqueia por 15s (comportamento de ping embutido)
+                messages = await read_sse_stream(job_id, last_id)
+                
+                if not messages:
+                    # 15s sem novidades: envia o ping para não levar timeout da Vercel
+                    yield "data: keepalive\n\n"
+                    continue
+                
+                for msg_id, fields in messages:
+                    # msg_id pode vir como bytes dependendo do client e decode_responses
+                    current_id = msg_id if isinstance(msg_id, str) else msg_id.decode('utf-8')
+                    last_id = current_id
+                    
+                    data_str = fields.get('data') or fields.get(b'data')
+                    if isinstance(data_str, bytes):
+                        data_str = data_str.decode('utf-8')
+                    
+                    # Envia o ID para o navegador saber de onde retomar se cair
+                    yield f"id: {current_id}\n"
+                    yield f"data: {data_str}\n\n"
+                    
+                    if '"type": "job_completed"' in data_str:
+                        await asyncio.sleep(2.0)
+                        return
+                        
         except asyncio.CancelledError:
             pass
         except Exception as e:

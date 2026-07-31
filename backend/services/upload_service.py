@@ -131,90 +131,69 @@ async def processar_lote_stateless_async(itens: list[StatelessBatchItem], job_id
     """Recebe um lote (chunk) enviado pelo frontend e processa sincronicamente ou em background emitindo SSE."""
     from services.ai_service import async_openai_client
     
-    # 1. Filtra itens validos para evitar tokens desnecessários
-    valid_items = []
+    from services.ai_service import async_openai_client, corrigir_descricoes_lote_async
     
-    for item in itens:
-        desc = str(item.descricao).strip()
-        if desc and desc.lower() != "nan":
-            valid_items.append(item)
+    async def run_task(item, vector):
+        try:
+            res = await process_item_with_semaphore(item, processar_real_ai, vector)
+        except Exception as e:
+            res = {"id": item.id, "status": "ERRO", "erro": f"Falha catastrófica no item: {str(e)}"}
             
-    # 1.5 Correção e Enriquecimento em Lote (Agente Normalizador) com Chunking
-    from services.ai_service import corrigir_descricoes_lote_async
-    
-    payload_correcao = [{"id": it.id, "descricao_original": it.descricao} for it in valid_items]
-    correcoes = {}
-    
-    normalizer_semaphore = asyncio.Semaphore(5)
-    
-    async def process_norm_chunk(chunk):
-        async with normalizer_semaphore:
-            return await corrigir_descricoes_lote_async(chunk)
-            
-    norm_tasks = []
-    chunk_size_norm = 50
-    for i in range(0, len(payload_correcao), chunk_size_norm):
-        chunk = payload_correcao[i:i + chunk_size_norm]
-        norm_tasks.append(process_norm_chunk(chunk))
-        
-    resultados_norm = await asyncio.gather(*norm_tasks)
-    for r in resultados_norm:
-        if r:
-            correcoes.update(r)
-    
-    valid_texts = []
-    for it in valid_items:
-        # Usa a corrigida se disponível, senão fallback para original
-        dados_corrigidos = correcoes.get(it.id)
-        if dados_corrigidos:
-            desc_enriquecida = dados_corrigidos.get("descricao_corrigida") or it.descricao
-            it.tipo_item = dados_corrigidos.get("tipo_item", "SERVICO")
-        else:
-            desc_enriquecida = it.descricao
-            it.tipo_item = "SERVICO"
-            
-        it.descricao_enriquecida = desc_enriquecida
-        valid_texts.append(desc_enriquecida)
-            
-    # 2. Gera todos os Embeddings do Lote com Chunking
-    embeddings_map = {}
-    if valid_texts:
-        emb_semaphore = asyncio.Semaphore(10)
-        
-        async def process_emb_chunk(chunk_texts, chunk_items):
-            async with emb_semaphore:
-                try:
-                    res = await async_openai_client.embeddings.create(model="text-embedding-3-small", input=chunk_texts)
-                    return {chunk_items[j].id: data.embedding for j, data in enumerate(res.data)}
-                except Exception as e:
-                    print(f"Erro no Batch Embedding: {str(e)}")
-                    return {}
-                    
-        emb_tasks = []
-        chunk_size_emb = 100
-        for i in range(0, len(valid_texts), chunk_size_emb):
-            chunk_texts = valid_texts[i:i + chunk_size_emb]
-            chunk_items = valid_items[i:i + chunk_size_emb]
-            emb_tasks.append(process_emb_chunk(chunk_texts, chunk_items))
-            
-        resultados_emb = await asyncio.gather(*emb_tasks)
-        for r in resultados_emb:
-            if r:
-                embeddings_map.update(r)
-    
-    # 3. Processa
-    async def run_task(item):
-        vector = embeddings_map.get(item.id)
-        res = await process_item_with_semaphore(item, processar_real_ai, vector)
-        
         if job_id:
-            # Emitir evento SSE
             await publish_sse_event(job_id, {"type": "item_processed", "data": res})
-            
         return res
 
-    tasks = [asyncio.create_task(run_task(it)) for it in itens]
-    resultados = await asyncio.gather(*tasks)
+    all_tasks = []
+    chunk_size = 50
+    
+    # Processamento em Chunks para Streaming real via SSE
+    for i in range(0, len(itens), chunk_size):
+        chunk_items = itens[i:i+chunk_size]
+        
+        # Filtra os válidos deste chunk
+        valid_chunk = [it for it in chunk_items if str(it.descricao).strip() and str(it.descricao).lower() != "nan" and not getattr(it, "is_macro_item", False)]
+        
+        embeddings_map = {}
+        
+        if valid_chunk:
+            payload_correcao = [{"id": it.id, "descricao_original": it.descricao} for it in valid_chunk]
+            # 1. Normaliza o Chunk
+            try:
+                correcoes = await corrigir_descricoes_lote_async(payload_correcao) or {}
+            except Exception as e:
+                print(f"Erro no Batch Normalization do chunk: {str(e)}")
+                correcoes = {}
+            
+            valid_texts = []
+            for it in valid_chunk:
+                dados_corrigidos = correcoes.get(it.id)
+                if dados_corrigidos:
+                    desc_enriquecida = dados_corrigidos.get("descricao_corrigida") or it.descricao
+                    it.tipo_item = dados_corrigidos.get("tipo_item", "SERVICO")
+                else:
+                    desc_enriquecida = it.descricao
+                    it.tipo_item = "SERVICO"
+                it.descricao_enriquecida = desc_enriquecida
+                valid_texts.append(desc_enriquecida)
+            
+            # 2. Gera Embeddings do Chunk
+            if valid_texts:
+                try:
+                    res = await async_openai_client.embeddings.create(model="text-embedding-3-small", input=valid_texts)
+                    for j, data in enumerate(res.data):
+                        embeddings_map[valid_chunk[j].id] = data.embedding
+                except Exception as e:
+                    print(f"Erro no Batch Embedding do chunk: {str(e)}")
+        
+        # 3. Despacha tarefas de busca para todos os itens do chunk
+        # As tarefas rodam em background (asyncio.create_task) enquanto o loop avança para o próximo chunk.
+        # Isso permite que os itens comecem a ser finalizados e enviados via SSE quase instantaneamente!
+        for it in chunk_items:
+            vector = embeddings_map.get(it.id)
+            all_tasks.append(asyncio.create_task(run_task(it, vector)))
+            
+    # Aguarda todas as tarefas finalizarem (blindado contra exceções não tratadas)
+    resultados = await asyncio.gather(*all_tasks, return_exceptions=True)
     
     if job_id:
         await publish_sse_event(job_id, {"type": "job_completed"})

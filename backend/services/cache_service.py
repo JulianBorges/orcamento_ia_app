@@ -53,38 +53,59 @@ async def set_semantic_cache(descricao: str, resultado: dict, ttl_seconds: int =
         print(f"Erro ao salvar cache no Redis: {e}")
 
 async def publish_sse_event(job_id: str, event_data: dict):
-    """Publica um evento no canal do job_id."""
+    """Grava um evento no Stream durável do job_id."""
     client = get_redis_client()
     if client:
         try:
-            await client.publish(f"job_{job_id}", json.dumps(event_data))
+            stream_key = f"job_stream_{job_id}"
+            await client.xadd(stream_key, {"data": json.dumps(event_data)})
+            # Garante que o stream seja deletado automaticamente (cleanup)
+            await client.expire(stream_key, 3600) # TTL de 1 hora
         except Exception as e:
-            print(f"Erro no Pub/Sub do Redis: {e}")
+            print(f"Erro no XADD do Redis Streams: {e}")
     else:
-        # Fallback in-memory
-        if job_id in _memory_queues:
-            for q in _memory_queues[job_id]:
-                await q.put({"type": "message", "data": json.dumps(event_data)})
-
-async def subscribe_sse_events(job_id: str):
-    """Assina o canal do job_id para o SSE."""
-    client = get_redis_client()
-    if not client:
-        import asyncio
-        # Fallback in-memory (Mock do PubSub object)
+        # Fallback in-memory para desenvolvimento sem Redis local
         if job_id not in _memory_queues:
             _memory_queues[job_id] = []
-        q = asyncio.Queue()
-        _memory_queues[job_id].append(q)
         
-        class MemoryPubSub:
-            async def listen(self):
-                while True:
-                    msg = await q.get()
-                    yield msg
-                    
-        return MemoryPubSub()
-    
-    pubsub = client.pubsub()
-    await pubsub.subscribe(f"job_{job_id}")
-    return pubsub
+        # Simula o ID timestamp-seq do Redis Stream
+        fake_id = f"{len(_memory_queues[job_id])}-0"
+        _memory_queues[job_id].append({"id": fake_id, "data": json.dumps(event_data)})
+
+async def read_sse_stream(job_id: str, last_id: str = "0-0"):
+    """Lê as mensagens do Stream do job_id bloqueando por até 15s (Heartbeat)."""
+    client = get_redis_client()
+    if client:
+        try:
+            stream_key = f"job_stream_{job_id}"
+            # xread retorna: [[stream_name, [(msg_id, {fields}), ...]]]
+            messages = await client.xread({stream_key: last_id}, count=100, block=15000)
+            if messages:
+                return messages[0][1] # Retorna a lista de tuplas [(msg_id, fields)]
+            return []
+        except Exception as e:
+            print(f"Erro no XREAD do Redis Streams: {e}")
+            import asyncio
+            await asyncio.sleep(1) # Previne loop infinito silencioso
+            return []
+    else:
+        # Fallback in-memory stream reader
+        import asyncio
+        stream = _memory_queues.get(job_id, [])
+        
+        try:
+            start_idx = int(last_id.split("-")[0]) + 1 if last_id != "0-0" else 0
+        except ValueError:
+            start_idx = 0
+            
+        if start_idx < len(stream):
+            msgs = stream[start_idx:start_idx+100]
+            return [(m["id"], {"data": m["data"]}) for m in msgs]
+            
+        # Simula o block=15000 iterativamente
+        for _ in range(15):
+            await asyncio.sleep(1)
+            if len(stream) > start_idx:
+                msgs = stream[start_idx:start_idx+100]
+                return [(m["id"], {"data": m["data"]}) for m in msgs]
+        return []

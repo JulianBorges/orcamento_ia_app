@@ -22,14 +22,15 @@ export const useBudgetProcessor = () => {
         });
     };
 
-    // Efeito Dominó (Fila Global) - Movido para cá
+    // Efeito Dominó Acelerado (Esvazia toda a fila de uma vez)
     useEffect(() => {
         const interval = setInterval(() => {
             if (pendingVisualUpdates.current.length > 0) {
-                const nextUpdate = pendingVisualUpdates.current.shift();
-                setTableData(prev => prev.map(oldItem => 
-                    oldItem.id === nextUpdate.id ? nextUpdate : oldItem
-                ));
+                const batch = pendingVisualUpdates.current.splice(0, pendingVisualUpdates.current.length);
+                setTableData(prev => {
+                    const map = new Map(batch.map(item => [item.id, item]));
+                    return prev.map(oldItem => map.has(oldItem.id) ? map.get(oldItem.id)! : oldItem);
+                });
             }
         }, 100);
         return () => clearInterval(interval);
@@ -103,7 +104,15 @@ export const useBudgetProcessor = () => {
             const eventSource = new EventSource(`/api/orcamento/stream/${jobId}`);
             
             eventSource.onmessage = (event) => {
-                const message = JSON.parse(event.data);
+                if (event.data === 'keepalive') return;
+                
+                let message;
+                try {
+                    message = JSON.parse(event.data);
+                } catch (err) {
+                    console.error("Erro no parse do SSE:", err, "Data:", event.data);
+                    return;
+                }
                 
                 if (message.type === 'item_processed') {
                     completed += 1;
