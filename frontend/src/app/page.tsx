@@ -10,15 +10,8 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { z } from "zod";
 import { useBudgetStore } from "@/store/useBudgetStore";
-
-const excelRowSchema = z.object({
-  descricao: z.string().min(1, "Descrição vazia").default("Item sem descrição"),
-  quantidade: z.number().default(1.0),
-  unidade: z.string().default("-"),
-  valorUnit: z.number().default(0.0),
-  is_macro_item: z.boolean().default(false),
-  macro_etapa_pai: z.string().default("")
-});
+import { useAutoSave } from "@/hooks/useAutoSave";
+import { useBudgetProcessor } from "@/hooks/useBudgetProcessor";
 
 
 export default function Home() {
@@ -27,26 +20,31 @@ export default function Home() {
   const [passwordInput, setPasswordInput] = useState("");
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showCreatorModal, setShowCreatorModal] = useState(false);
-  const [showFlatListModal, setShowFlatListModal] = useState(false);
-  const [pendingFlatRows, setPendingFlatRows] = useState<any[]>([]);
   const [creatorInitialQuery, setCreatorInitialQuery] = useState("");
   const [creatorTargetRowIndex, setCreatorTargetRowIndex] = useState<number | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
-  const [isPaused, setIsPaused] = useState(false);
-  const isPausedRef = useRef(false);
-
-  const togglePause = () => {
-      setIsPaused(!isPaused);
-      isPausedRef.current = !isPaused;
-  };
 
   const {
     tableData, bdi, title, isProcessing, uploadProgress,
     setTableData, setBdi, setTitle, setIsProcessing, setUploadProgress, clearBudget
   } = useBudgetStore();
 
+  const { saveStatus } = useAutoSave(tableData, title);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const pendingVisualUpdates = useRef<any[]>([]);
+
+  const {
+      processFile,
+      handleFileUpload,
+      pendingFlatRows,
+      setPendingFlatRows,
+      showFlatListModal,
+      setShowFlatListModal,
+      isPaused,
+      togglePause,
+      generateEapWithAI,
+      startBatchProcessing
+  } = useBudgetProcessor();
 
   useEffect(() => {
     setIsMounted(true);
@@ -54,6 +52,15 @@ export default function Home() {
         setIsAuthenticated(true);
     }
   }, []);
+
+  const totalComBdi = useMemo(() => {
+      return tableData.reduce((acc, row) => {
+          const quant = Number(row.quant) || 0;
+          const valor = Number(row.valorUnit) || 0;
+          const totalBase = quant * valor;
+          return acc + (totalBase * (1 + bdi / 100));
+      }, 0);
+  }, [tableData, bdi]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,356 +74,13 @@ export default function Home() {
 
 
 
-  // Efeito Dominó (Fila Global)
-  useEffect(() => {
-      if (!isMounted) return;
-      const interval = setInterval(() => {
-          if (pendingVisualUpdates.current.length > 0) {
-              const nextUpdate = pendingVisualUpdates.current.shift();
-              setTableData(prev => prev.map(oldItem => 
-                  oldItem.id === nextUpdate.id ? nextUpdate : oldItem
-              ));
-          }
-      }, 100);
-      return () => clearInterval(interval);
-  }, [isMounted, setTableData]);
-
-  const totalComBdi = useMemo(() => {
-      return tableData.reduce((acc, row) => {
-          const quant = Number(row.quant) || 0;
-          const valor = Number(row.valorUnit) || 0;
-          const totalBase = quant * valor;
-          return acc + (totalBase * (1 + bdi / 100));
-      }, 0);
-  }, [tableData, bdi]);
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (tableData.length > 0) {
-      setPendingFile(file);
-      setShowUploadDialog(true);
-    } else {
-      processFile(file, false);
-    }
-    
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  };
-
-  const processFile = async (file: File, append: boolean) => {
-    setIsProcessing(true);
-    setUploadProgress(0);
-    setShowUploadDialog(false);
-    setPendingFile(null);
-
-    try {
-        const data = await file.arrayBuffer();
-        const workbook = XLSX.read(data, { type: "array" });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet);
-        
-        let currentMacro = "";
-        const rows = jsonData.map((row: any, index: number) => {
-            let descricao = "";
-            let rawQuantidade = undefined;
-            let quantidade = 1.0;
-            let unidade = "";
-            let rawValorUnit = undefined;
-            let valorUnit = 0.0;
-            
-            for (const key of Object.keys(row)) {
-                const lowerKey = String(key).toLowerCase();
-                if (['descricao', 'descrição', 'servico', 'serviço', 'nome'].includes(lowerKey)) {
-                    descricao = row[key];
-                }
-                else if (['quant', 'quantidade', 'qtd', 'qnt'].includes(lowerKey)) {
-                    rawQuantidade = row[key];
-                    quantidade = parseFloat(row[key]) || 1.0;
-                }
-                else if (['und', 'un', 'unidade', 'medida'].includes(lowerKey)) {
-                    unidade = String(row[key]);
-                }
-                else if (['valor', 'preco', 'preço', 'unitario', 'unitário', 'custo'].includes(lowerKey)) {
-                    rawValorUnit = row[key];
-                    valorUnit = parseFloat(String(row[key]).replace(',', '.')) || 0.0;
-                }
-            }
-            if (!descricao) {
-                // Fallback to first property if description is empty
-                descricao = row[Object.keys(row)[0]] || "";
-            }
-            
-            // Macro-item detection: if quantity, value AND unit are missing/empty in raw data, it's a macro
-            const isMissingQuant = rawQuantidade === undefined || String(rawQuantidade).trim() === "" || parseFloat(String(rawQuantidade)) === 0;
-            const isMissingValor = rawValorUnit === undefined || String(rawValorUnit).trim() === "" || parseFloat(String(rawValorUnit).replace(',', '.')) === 0;
-            const isMissingUnidade = unidade === undefined || String(unidade).trim() === "" || String(unidade).trim() === "-";
-            const is_macro_item = (isMissingQuant && isMissingValor && isMissingUnidade) || String(row['Item'] || '').endsWith('.0');
-            
-            if (is_macro_item) {
-                currentMacro = String(descricao);
-            }
-            
-            const parsed = excelRowSchema.safeParse({
-                descricao: String(descricao),
-                quantidade: is_macro_item ? 0.0 : (isNaN(quantidade) ? 1.0 : quantidade),
-                unidade: String(unidade),
-                valorUnit: is_macro_item ? 0.0 : (isNaN(valorUnit) ? 0.0 : valorUnit),
-                is_macro_item: is_macro_item,
-                macro_etapa_pai: is_macro_item ? "" : currentMacro
-            });
-            
-            const validData = parsed.success ? parsed.data : {
-                descricao: "Item inválido detectado pelo Zod",
-                quantidade: 1.0,
-                unidade: "-",
-                valorUnit: 0.0,
-                is_macro_item: false,
-                macro_etapa_pai: ""
-            };
-            
-            return {
-                id: `r_${Date.now()}_${index}`,
-                ...validData
-            };
-        });
-
-        let macroCount = 0;
-        rows.forEach(r => {
-            if (r.is_macro_item) macroCount++;
-        });
-
-        if (macroCount === 0) {
-            setPendingFlatRows(rows);
-            setShowFlatListModal(true);
-            setIsProcessing(false);
-            setUploadProgress(null);
-            return;
-        }
-
-        startBatchProcessing(rows, append);
-
-    } catch (err) {
-        console.error("Erro ao ler ou processar Excel:", err);
-        setIsProcessing(false);
-        setUploadProgress(null);
-        alert("Ocorreu um erro ao processar o arquivo Excel.");
-    }
-  };
-
-  const startBatchProcessing = async (rows: any[], append: boolean) => {
-        setIsProcessing(true);
-        setUploadProgress(0);
-        
-        // Atualiza a tabela imediatamente com os itens "PENDENTE"
-        const initialItems: BudgetItem[] = rows.map((r, i) => ({
-             id: r.id,
-             item: r.item || "-",
-             codigo: r.codigo || '-',
-             base: r.base || '-',
-             descricao: r.descricao,
-             descricao_legada: r.descricao_legada || r.descricao,
-             und: r.unidade || r.und || '-',
-             quant: r.quantidade ?? r.quant ?? 1.0,
-             valorUnit: r.valorUnit || 0.0,
-             total: (r.valorUnit || 0.0) * (r.quantidade ?? r.quant ?? 1.0),
-             is_macro_item: r.is_macro_item,
-             macro_etapa_pai: r.macro_etapa_pai,
-             ai_status: r.ai_status || (r.is_macro_item ? '-' : 'PROCESSANDO'),
-             ai_justificativa: r.ai_justificativa || (r.is_macro_item ? '-' : 'Analisando via IA...')
-        }));
-        
-        // Limpa a fila do efeito dominó caso inicie novo lote
-        pendingVisualUpdates.current = [];
-        
-        // Atualiza o estado da tabela sincronicamente passando pelo recalculate
-        let currentTableData = append ? [...tableData, ...initialItems] : initialItems;
-        currentTableData = recalculateNumbers(currentTableData);
-        
-        setTableData(currentTableData);
-        
-        // Chunker (Lotes de 15 para máxima velocidade e evitar Timeout do Next.js)
-        const chunkSize = 15;
-        let completed = 0;
-        
-        for (let i = 0; i < rows.length; i += chunkSize) {
-            while (isPausedRef.current) {
-                await new Promise(resolve => setTimeout(resolve, 500));
-            }
-
-            const chunk = rows.slice(i, i + chunkSize).map(item => ({
-                id: item.id,
-                descricao: item.descricao,
-                quantidade: item.quantidade,
-                unidade: item.unidade,
-                valorUnit: item.valorUnit,
-                is_macro_item: item.is_macro_item,
-                macro_etapa_pai: item.macro_etapa_pai
-            }));
-            let retries = 3;
-            let success = false;
-            
-            while (retries > 0 && !success) {
-                try {
-                    const res = await fetch(`/api/orcamento/processar-lote-stateless`, {
-                        method: "POST",
-                        headers: { 
-                            "Content-Type": "application/json",
-                            "x-api-key": process.env.NEXT_PUBLIC_API_KEY || "chave-secreta-padrao"
-                        },
-                        body: JSON.stringify({ itens: chunk }),
-                    });
-                    
-                    if (!res.ok) throw new Error("Erro na API");
-                    
-                    const responseData = await res.json();
-                    
-                    if (responseData.resultados) {
-                        const updatedItemsMap = new Map();
-                        
-                        currentTableData = currentTableData.map(oldItem => {
-                            const resultRow = responseData.resultados.find((r: any) => r.id === oldItem.id);
-                            if (!resultRow) return oldItem;
-                            
-                            const resData = resultRow.resultado || {};
-                            const analise = resData.analise || {};
-                            const meta = resData.metadados || {};
-                            const isApproved = analise.status?.includes('ACEITO');
-                            const aiError = analise.erro || resData.erro || resultRow.erro;
-                            const aiStatus = oldItem.is_macro_item ? '-' : (analise.status || resData.status || resultRow.status || 'ERRO');
-                            
-                            const newItem = {
-                                ...oldItem,
-                                codigo: oldItem.is_macro_item ? '-' : (isApproved ? (meta.codigo || '-') : '-'),
-                                base: oldItem.is_macro_item ? '-' : (isApproved ? "SINAPI" : "-"),
-                                descricao: oldItem.is_macro_item ? oldItem.descricao : (isApproved ? (meta.descricao || oldItem.descricao) : oldItem.descricao),
-                                descricao_legada: oldItem.descricao_legada || oldItem.descricao,
-                                und: oldItem.is_macro_item ? '-' : (isApproved ? (meta.unidade || '-') : '-'),
-                                valorUnit: oldItem.is_macro_item ? 0.0 : (isApproved ? (meta.custo || 0.0) : 0.0),
-                                total: oldItem.is_macro_item ? 0.0 : ((isApproved ? (meta.custo || 0.0) : 0.0) * oldItem.quant),
-                                ai_status: aiStatus,
-                                ai_justificativa: oldItem.is_macro_item ? '-' : (analise.justificativa || resData.justificativa || aiError || 'Falha ao processar'),
-                                memoria_calculo: resData.memoria_calculo || []
-                            };
-                            
-                            updatedItemsMap.set(newItem.id, newItem);
-                            return newItem;
-                        });
-                        
-                        // Joga na fila global para o Efeito Domino (3s por item)
-                        pendingVisualUpdates.current.push(...Array.from(updatedItemsMap.values()));
-                    }
-                    success = true;
-                } catch (err) {
-                    retries--;
-                    if (retries === 0) {
-                        // Marca lote como erro
-                        currentTableData = currentTableData.map(oldItem => {
-                             if (chunk.some(c => c.id === oldItem.id)) {
-                                 return { ...oldItem, ai_status: 'ERRO', ai_justificativa: 'Falha de conexão com a API' };
-                             }
-                             return oldItem;
-                        });
-                        setTableData([...currentTableData]);
-                    } else {
-                        // Espera exponencial antes do retry para desafogar o servidor (3s, 6s)
-                        await new Promise(resolve => setTimeout(resolve, (4 - retries) * 3000));
-                    }
-                }
-            }
-            
-            completed += chunk.length;
-            setUploadProgress(Math.min(100, Math.round((completed / rows.length) * 100)));
-        }
-        
-        setTimeout(() => {
-            setIsProcessing(false);
-            setUploadProgress(null);
-        }, 1000);
-  };
-
-  const generateEapWithAI = async () => {
-    try {
-        setIsProcessing(true);
-        setUploadProgress(10); // Status visual
-        
-        const payload = {
-            itens: pendingFlatRows.map(r => ({ id: r.id, descricao: r.descricao }))
-        };
-
-        const res = await fetch(`/api/orcamento/estruturar-eap`, {
-            method: "POST",
-            headers: { 
-                "Content-Type": "application/json",
-                "x-api-key": process.env.NEXT_PUBLIC_API_KEY || "chave-secreta-padrao"
-            },
-            body: JSON.stringify(payload)
-        });
-
-        if (!res.ok) throw new Error("Falha ao gerar EAP com a IA.");
-        
-        const data = await res.json();
-        const etapas = data.data?.etapas || [];
-
-        // Reconstrói a lista inserindo as Macro-etapas
-        const newRows: any[] = [];
-        
-        etapas.forEach((etapa: any) => {
-            // Cria a linha fake de Macro-etapa
-            const macroRow = {
-                id: `macro_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                descricao: etapa.nome,
-                quantidade: 0,
-                unidade: "-",
-                valorUnit: 0,
-                is_macro_item: true,
-                macro_etapa_pai: ""
-            };
-            newRows.push(macroRow);
-
-            // Adiciona os itens filhos associados a ela
-            etapa.ids_servicos.forEach((id: string) => {
-                const originalItem = pendingFlatRows.find(r => r.id === id);
-                if (originalItem) {
-                    newRows.push({
-                        ...originalItem,
-                        macro_etapa_pai: etapa.nome
-                    });
-                }
-            });
-        });
-
-        // Adiciona qualquer item órfão que a IA esqueceu (fallback de segurança)
-        pendingFlatRows.forEach(originalItem => {
-            if (!newRows.find(r => r.id === originalItem.id)) {
-                newRows.push({
-                    ...originalItem,
-                    macro_etapa_pai: "Outros"
-                });
-            }
-        });
-
-        setUploadProgress(100);
-        
-        // Garante a numeração perfeita antes de processar
-        const newRowsNumbered = recalculateNumbers(newRows);
-        
-        // Inicia o processamento SINAPI agora com a lista estruturada!
-        startBatchProcessing(newRowsNumbered, false);
-
-    } catch (err) {
-        console.error(err);
-        alert("Erro ao estruturar EAP. Vamos prosseguir como Lista Plana.");
-        const fallbackNumbered = recalculateNumbers(pendingFlatRows);
-        startBatchProcessing(fallbackNumbered, false);
-    }
+  const onFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      handleFileUpload(e, setPendingFile, setShowUploadDialog, fileInputRef);
   };
 
   const handleClearBudget = () => {
       if (window.confirm("Tem certeza que deseja limpar todo o orçamento? Esta ação não pode ser desfeita.")) {
           clearBudget();
-          pendingVisualUpdates.current = [];
           if (fileInputRef.current) fileInputRef.current.value = "";
       }
   };
@@ -551,6 +215,9 @@ export default function Home() {
         <div className="w-full max-w-[1600px] mx-auto px-4 xl:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">Copiloto <span className="text-zinc-400 dark:text-zinc-500 font-light">Orçamento</span></span>
+            {saveStatus === 'saving' && <span className="ml-4 text-xs font-medium text-amber-500 bg-amber-500/10 px-2 py-1 rounded-full animate-pulse">☁️ Salvando...</span>}
+            {saveStatus === 'saved' && <span className="ml-4 text-xs font-medium text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-full">✅ Salvo</span>}
+            {saveStatus === 'error' && <span className="ml-4 text-xs font-medium text-red-500 bg-red-500/10 px-2 py-1 rounded-full">⚠️ Erro ao Salvar</span>}
           </div>
           <div className="flex items-center gap-4">
               <ThemeToggle />
@@ -616,7 +283,7 @@ export default function Home() {
                   </div>
               )}
               
-              <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx,.xls" onChange={handleFileUpload} />
+              <input type="file" ref={fileInputRef} className="hidden" accept=".xlsx,.xls" onChange={onFileInputChange} />
               
               {tableData.length === 0 && (
                   <button 
@@ -690,13 +357,25 @@ export default function Home() {
                             Cancelar
                         </button>
                         <button 
-                            onClick={() => pendingFile && processFile(pendingFile, false)}
+                            onClick={() => {
+                  if(pendingFile) {
+                      setShowUploadDialog(false);
+                      setPendingFile(null);
+                      processFile(pendingFile, false);
+                  }
+                }}
                             className="px-4 py-2 text-sm font-medium bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-md transition-colors"
                         >
                             Sobrepor Tudo
                         </button>
                         <button 
-                            onClick={() => pendingFile && processFile(pendingFile, true)}
+                            onClick={() => {
+                  if(pendingFile) {
+                      setShowUploadDialog(false);
+                      setPendingFile(null);
+                      processFile(pendingFile, true);
+                  }
+                }}
                             className="px-4 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-md transition-colors shadow-lg"
                         >
                             Acrescentar ao Final

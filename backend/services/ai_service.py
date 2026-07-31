@@ -1,7 +1,7 @@
 import os
 import re
 import asyncio
-import sqlite3
+import asyncpg
 from openai import AsyncOpenAI
 from pinecone import Pinecone
 from models.schemas import (
@@ -20,9 +20,11 @@ pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 # Cache Semântico em Memória: Armazena até 1000 buscas recentes por 1 hora
 semantic_cache = TTLCache(maxsize=1000, ttl=3600)
 
-def get_sqlite_conn():
-    db_path = Path(__file__).parent.parent / "sinapi.db"
-    return sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+async def get_pg_conn():
+    db_url = os.getenv("SUPABASE_DATABASE_URL")
+    if not db_url:
+        raise RuntimeError("SUPABASE_DATABASE_URL não configurada no .env")
+    return await asyncpg.connect(db_url)
 
 # O índice deve existir. Falhamos rápido (Fail-Fast) se houver erro para não mascarar problemas.
 try:
@@ -155,52 +157,55 @@ async def buscar_semelhantes_pinecone_async(descricao: str, top_k: int = 15, vec
     # Nota: se for chamado diretamente, ele retorna os 100 itens.
     return semantic_matches
 
-def buscar_sqlite_sync(query: str, top_k: int = 15):
-    """Busca ultra-rápida no SQLite FTS5 (Lexical puro)."""
-    # Remove pontuações e cria a query FTS
+async def buscar_pg_async(query: str, top_k: int = 15):
+    """Busca ultra-rápida no PostgreSQL via FTS (Lexical puro)."""
+    # Remove pontuações
     query_limpa = re.sub(r'[^\w\s]', ' ', query)
     tokens = [t for t in query_limpa.split() if len(t) > 1 or t.isdigit()]
     if not tokens:
         return []
     
-    fts_query = " ".join([f"{t}*" for t in tokens])
+    # Monta a query para o plainto_tsquery (token1 & token2...)
+    pg_query = " & ".join(tokens)
     
-    conn = get_sqlite_conn()
     try:
-        cursor = conn.cursor()
-        cursor.execute('''
-            SELECT codigo, descricao, preco, unidade 
-            FROM composicoes 
-            WHERE composicoes MATCH ? 
-            ORDER BY rank 
-            LIMIT ?
-        ''', (fts_query, top_k))
+        conn = await get_pg_conn()
+        
+        # A tabela sinapi_composicoes tem o índice GIN na coluna busca_textual
+        rows = await conn.fetch('''
+            SELECT codigo, descricao, preco, unidade, estado, modalidade,
+                   ts_rank(busca_textual, websearch_to_tsquery('portuguese', $1)) as rank
+            FROM sinapi_composicoes
+            WHERE busca_textual @@ websearch_to_tsquery('portuguese', $1)
+            ORDER BY rank DESC
+            LIMIT $2
+        ''', pg_query, top_k)
+        
+        await conn.close()
         
         resultados = []
-        for row in cursor.fetchall():
+        for row in rows:
             resultados.append({
-                'id': row[0],
+                'id': row['codigo'],
                 'score': 1.0, # Match exato
                 'metadata': {
-                    'codigo': row[0],
-                    'descricao': row[1],
-                    'preco': row[2],
-                    'unidade': row[3]
+                    'codigo': row['codigo'],
+                    'descricao': row['descricao'],
+                    'preco': float(row['preco']),
+                    'unidade': row['unidade']
                 }
             })
         return resultados
     except Exception as e:
-        print("Erro SQLite FTS:", e)
+        print("Erro PG FTS:", e)
         return []
-    finally:
-        conn.close()
 
-async def buscar_sqlite_async(query: str, top_k: int = 15):
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, lambda: buscar_sqlite_sync(query, top_k))
+async def buscar_lexical_pg_async(query: str, top_k: int = 15):
+    # Chamando o Postgres FTS
+    return await buscar_pg_async(query, top_k)
 
 async def buscar_verdadeiro_hibrido_async(descricao: str, top_k: int = 15, vector: list = None):
-    """Busca no Pinecone (Semântico) + SQLite (Lexical) e passa pelo Reranker."""
+    """Busca no Pinecone (Semântico) + PostgreSQL (Lexical) e passa pelo Reranker."""
     
     # Verifica cache (apenas se vector for None, que é o caso comum sem batching)
     cache_key = f"hibrido_{descricao}_{top_k}"
@@ -209,16 +214,16 @@ async def buscar_verdadeiro_hibrido_async(descricao: str, top_k: int = 15, vecto
         
     # Dispara as duas buscas em paralelo
     task_pinecone = buscar_semelhantes_pinecone_async(descricao, top_k=50, vector=vector) # Traz 100 por baixo dos panos
-    task_sqlite = buscar_sqlite_async(descricao, top_k=20)
+    task_pg = buscar_lexical_pg_async(descricao, top_k=20)
     
-    res_pinecone, res_sqlite = await asyncio.gather(task_pinecone, task_sqlite)
+    res_pinecone, res_pg = await asyncio.gather(task_pinecone, task_pg)
     
     # Junta resultados removendo duplicadas
     vistos = set()
     matches_combinados = []
     
-    # Prioriza o SQLite pois são Matches Exatos
-    for m in res_sqlite:
+    # Prioriza o PG pois são Matches Exatos
+    for m in res_pg:
         if m['id'] not in vistos:
             vistos.add(m['id'])
             matches_combinados.append(m)
