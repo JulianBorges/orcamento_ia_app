@@ -5,17 +5,17 @@
 ## 🎯 SPRINT 1: Fundação, Persistência e Entregável Rápido (Prioridade Zero)
 *Objetivo: Eliminar a perda de dados no navegador, desvincular o sistema de arquivos locais e entregar um valor tangível imediato para o usuário.*
 
-- [x] **1.1 Banco na Nuvem (Supabase):**
-  - [x] Migrar o banco relacional de preços (SINAPI) e o estado da aplicação do SQLite local para o Supabase (PostgreSQL) ou Turso.
-  - [x] Habilitar atualização constante da tabela SINAPI em produção sem necessidade de novos deploys da aplicação.
+- [ ] **1.1 Banco na Nuvem (Supabase):**
+  - [ ] Migrar o banco relacional de preços (SINAPI) e o estado da aplicação do SQLite local para o Supabase (PostgreSQL) ou Turso.
+  - [ ] Habilitar atualização constante da tabela SINAPI em produção sem necessidade de novos deploys da aplicação.
 
-- [x] **1.2 Persistência e Auto-Save Assíncrono (Zustand + Nuvem):**
-  - [x] Manter a memória reativa no cliente via Zustand para performance a 60 FPS.
-  - [x] Criar mecanismo de Shadow Save / Auto-Save assíncrono (com Debounce) que grava deltas no banco remoto sem travar a interface do usuário.
+- [ ] **1.2 Persistência e Auto-Save Assíncrono (Zustand + Nuvem):**
+  - [ ] Manter a memória reativa no cliente via Zustand para performance a 60 FPS.
+  - [ ] Criar mecanismo de Shadow Save / Auto-Save assíncrono (com Debounce) que grava deltas no banco remoto sem travar a interface do usuário.
 
-- [x] **1.3 Tratamento e Validação no Upload:**
-  - [x] Implementar validação e tipagem estrita dos arquivos do Excel recebidos utilizando Zod antes do processamento.
-  - [x] Isolar a lógica de processamento massivo do `page.tsx` em Custom Hooks dedicados (ex: `useBudgetProcessor.ts`).
+- [ ] **1.3 Tratamento e Validação no Upload:**
+  - [ ] Implementar validação e tipagem estrita dos arquivos do Excel recebidos utilizando Zod antes do processamento.
+  - [ ] Isolar a lógica de processamento massivo do `page.tsx` em Custom Hooks dedicados (ex: `useBudgetProcessor.ts`).
 
 ---
 
@@ -30,7 +30,7 @@
   - [ ] Adicionar Server-Sent Events (SSE) para atualizar a tabela na tela do usuário em tempo real, linha a linha (estilo streaming).
 
 - [ ] **2.3 Cache Semântico Global (Redis):**
-  - [ ] Criar camada de cache com Hash MD5 e TTL de 7 a 15 dias para memorizar pesquisas por itens comuns (ex: "Cimento CP II").
+  - [ ] Criar camada de cache com Hash  D5 e TTL de 7 a 15 dias para memorizar pesquisas por itens comuns (ex: "Cimento CP II").
   - [ ] Validar a redução de latência para milissegundos e o corte de custos repetitivos de chamadas à OpenAI.
 
 ---

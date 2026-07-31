@@ -134,6 +134,22 @@ async def seed():
         CREATE INDEX idx_analitica_item ON sinapi_analitica (codigo_item, estado, modalidade);
     ''')
 
+    # Habilitar RLS em todas as tabelas
+    await conn.execute('''
+        ALTER TABLE sinapi_composicoes ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE sinapi_insumos ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE sinapi_analitica ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE budgets ENABLE ROW LEVEL SECURITY;
+        
+        -- Políticas de Leitura para tabelas base (livres para leitura pelo app, protegidas para gravação)
+        CREATE POLICY select_composicoes ON sinapi_composicoes FOR SELECT USING (true);
+        CREATE POLICY select_insumos ON sinapi_insumos FOR SELECT USING (true);
+        CREATE POLICY select_analitica ON sinapi_analitica FOR SELECT USING (true);
+        
+        -- Política temporária permissiva para orçamentos (Será substituída na Sprint de Autenticação)
+        CREATE POLICY anon_all_budgets ON budgets FOR ALL USING (true) WITH CHECK (true);
+    ''')
+
     # Triggers FTS para Insumos
     await conn.execute('''
         CREATE OR REPLACE FUNCTION insumos_tsvector_trigger() RETURNS trigger AS $$
@@ -141,7 +157,7 @@ async def seed():
           new.busca_textual := to_tsvector('portuguese', coalesce(new.descricao, ''));
           return new;
         end
-        $$ LANGUAGE plpgsql;
+        $$ LANGUAGE plpgsql SET search_path = public;
 
         CREATE TRIGGER tsvectorupdate_insumos BEFORE INSERT OR UPDATE
         ON sinapi_insumos FOR EACH ROW EXECUTE FUNCTION insumos_tsvector_trigger();
@@ -156,7 +172,7 @@ async def seed():
           new.busca_textual := to_tsvector('portuguese', coalesce(new.descricao, ''));
           return new;
         end
-        $$ LANGUAGE plpgsql;
+        $$ LANGUAGE plpgsql SET search_path = public;
 
         CREATE TRIGGER tsvectorupdate_composicoes BEFORE INSERT OR UPDATE
         ON sinapi_composicoes FOR EACH ROW EXECUTE FUNCTION composicoes_tsvector_trigger();
