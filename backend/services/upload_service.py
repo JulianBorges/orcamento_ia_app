@@ -10,15 +10,19 @@ from models.schemas import StatelessBatchItem
 from services.cache_service import publish_sse_event
 
 # Semáforo global para concorrência da OpenAI
-# Reduzido para 30 para equilibrar throughput e evitar Rate Limits pesados (Fail-Fast Serverless)
-openai_semaphore = asyncio.Semaphore(30)
+# Reduzido para 10 para não estourar o limite de 200k TPM (Tokens Per Minute) da OpenAI
+openai_semaphore = asyncio.Semaphore(10)
 
 async def process_item_with_semaphore(item: StatelessBatchItem, ai_function, *args):
-    """Executa uma função de IA respeitando o limite do semáforo com retentativas (Retry Logic adaptada para Vercel Hobby)."""
-    max_retries = 2
+    """Executa uma função de IA respeitando o limite do semáforo com retentativas e backoff."""
+    max_retries = 5
     async with openai_semaphore:
         for attempt in range(max_retries):
             try:
+                # Pequeno delay inicial espalhado para evitar thundering herd no primeiro segundo
+                if attempt == 0:
+                    await asyncio.sleep(np.random.uniform(0.1, 1.5))
+                    
                 resultado = await ai_function(item, *args)
                 
                 # Se a função interna retornou ERRO por Rate Limit ou Timeout, lançamos a exceção para ativar o Retry
@@ -37,13 +41,16 @@ async def process_item_with_semaphore(item: StatelessBatchItem, ai_function, *ar
                 # Considera Rate Limits, Timeouts e problemas de conexão da OpenAI como passíveis de Retry
                 if any(term in erro_str for term in ["429", "rate limit", "502", "503", "timeout", "timed out", "connection", "overloaded"]):
                     if attempt < max_retries - 1:
-                        wait_time = 1.5 * (attempt + 1)
+                        # Exponential backoff com Jitter: (2^attempt) + tempo sugerido pela OpenAI (se houver)
+                        base_wait = (2 ** attempt) + np.random.uniform(1.0, 3.0)
+                        
                         import re
                         match = re.search(r'try again in (\d+(?:\.\d+)?)s', erro_str)
                         if match:
-                            # Adiciona uma margem de segurança de 10%
-                            wait_time = float(match.group(1)) * 1.1
-                        await asyncio.sleep(wait_time)
+                            base_wait = max(base_wait, float(match.group(1)) * 1.2)
+                            
+                        print(f"Rate Limit atingido no item {item.id}. Aguardando {base_wait:.2f}s (Tentativa {attempt+1}/{max_retries})...")
+                        await asyncio.sleep(base_wait)
                         continue
                 return {"id": item.id, "status": "ERRO", "erro": str(e)}
 

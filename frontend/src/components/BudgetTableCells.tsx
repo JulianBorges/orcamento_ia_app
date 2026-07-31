@@ -183,9 +183,14 @@ export const AutocompleteDescricaoCell = ({ initialValue, rowIndex, onUpdateRow,
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, [wrapperRef, val, onUpdateRow]);
 
+    const onOpenChangeRef = useRef(onOpenChange);
     useEffect(() => {
-        if (onOpenChange) onOpenChange(isOpen);
-    }, [isOpen, onOpenChange]);
+        onOpenChangeRef.current = onOpenChange;
+    }, [onOpenChange]);
+
+    useEffect(() => {
+        if (onOpenChangeRef.current) onOpenChangeRef.current(isOpen);
+    }, [isOpen]);
 
 
 

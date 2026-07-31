@@ -25,7 +25,7 @@ export default function Home() {
   const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   const {
-    tableData, bdi, title, isProcessing, uploadProgress,
+    tableData, bdi, title, isProcessing, uploadProgress, processingStatusText, processedItemsCount,
     setTableData, setBdi, setTitle, setIsProcessing, setUploadProgress, clearBudget
   } = useBudgetStore();
 
@@ -266,20 +266,20 @@ export default function Home() {
               )}
 
               {uploadProgress !== null && (
-                  <div className="flex items-center gap-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full px-4 py-1.5 shadow-inner">
-                      <button 
-                          onClick={togglePause}
-                          className="relative flex items-center justify-center w-6 h-6 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors group focus:outline-none"
-                          title={isPaused ? "Retomar Analise" : "Pausar Analise"}
-                      >
-                          {!isPaused && <Loader2 className="w-4 h-4 text-indigo-400 animate-spin group-hover:opacity-0 transition-opacity absolute" />}
-                          {!isPaused && <Pause className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity absolute" />}
-                          {isPaused && <Play className="w-3.5 h-3.5 text-emerald-500 absolute" />}
-                      </button>
-                      <div className="w-32 h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                          <div className={`h-full transition-all duration-300 ease-out ${isPaused ? 'bg-zinc-400 dark:bg-zinc-600' : 'bg-indigo-500'}`} style={{ width: `${uploadProgress}%` }}></div>
+                  <div className="relative flex items-center gap-4 bg-white dark:bg-zinc-900/80 backdrop-blur-md border border-indigo-500/30 rounded-full px-5 py-2 shadow-[0_0_15px_rgba(99,102,241,0.2)]">
+                      <div className="absolute inset-0 bg-indigo-500/5 rounded-full animate-pulse"></div>
+                      <div className="relative flex items-center justify-center w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/50">
+                          <Loader2 className="w-4 h-4 text-indigo-500 animate-spin" />
                       </div>
-                      <span className={`text-xs font-medium font-mono ${isPaused ? 'text-zinc-400' : 'text-indigo-500 dark:text-indigo-400'}`}>{uploadProgress}%</span>
+                      <div className="relative flex flex-col justify-center min-w-[200px]">
+                          <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-100 mb-1">{processingStatusText || 'Processando...'}</span>
+                          <div className="w-48 h-1.5 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+                              <div className="h-full bg-indigo-500 transition-all duration-300 ease-out relative" style={{ width: `${uploadProgress}%` }}>
+                                  <div className="absolute inset-0 bg-white/30 w-full h-full animate-[shimmer_2s_infinite]"></div>
+                              </div>
+                          </div>
+                      </div>
+                      <span className="relative text-xs font-bold font-mono text-indigo-500">{uploadProgress}%</span>
                   </div>
               )}
               

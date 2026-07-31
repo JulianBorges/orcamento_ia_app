@@ -47,11 +47,11 @@
 
 - [ ] **3.3 Over-fetching, Filtros Rígidos e JSON Schema:**
   - [ ] Resgatar Top 20 dos bancos, aplicar Reranking e enviar apenas o Top 5 final para a LLM.
-  - [ ] Aplicar filtros obrigatórios de Estado (UF) e Desoneração na query antes da busca vetorial.
+  - [ NÃO ] Aplicar filtros obrigatórios de Estado (UF) e Desoneração na query antes da busca vetorial.
   - [ ] Substituir parsing via Regex pelo formato Structured Outputs (JSON Schema) da OpenAI.
 
 - [ ] **3.4 Engenharia de Prompt Especializada:**
-  - [ ] Injetar lógica de BDI diferenciado (Súmula 2622 do TCU) para fornecimento de materiais e equipamentos específicos.
+  - [ NÃO ] Injetar lógica de BDI diferenciado (Súmula 2622 do TCU) para fornecimento de materiais e equipamentos específicos.
   - [ ] Aplicar tolerâncias paramétricas (ex: margem rígida para aço, elástica para tubulações).
 
 ---

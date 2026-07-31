@@ -8,11 +8,15 @@ interface BudgetState {
   title: string;
   isProcessing: boolean;
   uploadProgress: number | null;
+  processingStatusText: string;
+  processedItemsCount: number;
   setTableData: (data: BudgetItem[] | ((prev: BudgetItem[]) => BudgetItem[])) => void;
   setBdi: (bdi: number) => void;
   setTitle: (title: string) => void;
   setIsProcessing: (isProcessing: boolean) => void;
   setUploadProgress: (progress: number | null) => void;
+  setProcessingStatusText: (text: string) => void;
+  setProcessedItemsCount: (count: number) => void;
   updateData: (rowIndex: number, columnId: string, value: any) => void;
   updateRow: (rowIndex: number, newRowData: Partial<BudgetItem>) => void;
   updateItemPosition: (oldIndex: number, newNumberText: string) => void;
@@ -27,6 +31,8 @@ export const useBudgetStore = create<BudgetState>()(
       title: 'Orçamento Base',
       isProcessing: false,
       uploadProgress: null,
+      processingStatusText: '',
+      processedItemsCount: 0,
 
       setTableData: (data) => set((state) => ({
         tableData: typeof data === 'function' ? data(state.tableData) : data
@@ -36,6 +42,8 @@ export const useBudgetStore = create<BudgetState>()(
       setTitle: (title) => set({ title }),
       setIsProcessing: (isProcessing) => set({ isProcessing }),
       setUploadProgress: (uploadProgress) => set({ uploadProgress }),
+      setProcessingStatusText: (processingStatusText) => set({ processingStatusText }),
+      setProcessedItemsCount: (processedItemsCount) => set({ processedItemsCount }),
 
       updateData: (rowIndex, columnId, value) => set((state) => {
         const newData = state.tableData.map((row, index) => {

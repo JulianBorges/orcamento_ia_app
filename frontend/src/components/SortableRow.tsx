@@ -8,6 +8,7 @@ export const SortableRow = React.memo( ({ row, virtualRow, data, setData, onOpen
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: row.original.id });
     
     const isAutocompleteOpen = activeAutocompleteRowId === row.original.id;
+    const isProcessing = row.original.ai_status === 'PROCESSANDO';
     
     const [isFocused, setIsFocused] = useState(false);
 
@@ -46,8 +47,11 @@ export const SortableRow = React.memo( ({ row, virtualRow, data, setData, onOpen
                 }, 0);
             }}
         >
+            {isProcessing && (
+                <div className="absolute inset-0 bg-zinc-200/40 dark:bg-zinc-700/30 animate-[pulse_1.5s_ease-in-out_infinite] pointer-events-none z-0"></div>
+            )}
             {/* Menu de Contexto */}
-            {!activeAutocompleteRowId && !isFocused && (
+            {!activeAutocompleteRowId && !isFocused && !isProcessing && (
                 <div 
                     className="absolute left-10 top-[85%] z-[70] hidden group-hover:flex justify-center items-center pointer-events-auto shadow-xl rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800"
                 >

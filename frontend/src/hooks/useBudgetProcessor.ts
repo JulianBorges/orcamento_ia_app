@@ -6,7 +6,7 @@ import { useBudgetStore } from '../store/useBudgetStore';
 import { fromZodError } from "zod-validation-error";
 
 export const useBudgetProcessor = () => {
-    const { tableData, setTableData, setIsProcessing, setUploadProgress } = useBudgetStore();
+    const { tableData, setTableData, setIsProcessing, setUploadProgress, setProcessingStatusText, setProcessedItemsCount } = useBudgetStore();
     const [pendingFlatRows, setPendingFlatRows] = useState<any[]>([]);
     const [showFlatListModal, setShowFlatListModal] = useState(false);
     
@@ -38,6 +38,8 @@ export const useBudgetProcessor = () => {
     const startBatchProcessing = async (rows: any[], append: boolean) => {
         setIsProcessing(true);
         setUploadProgress(0);
+        setProcessedItemsCount(0);
+        setProcessingStatusText('Preparando lote para envio...');
         
         const initialItems: BudgetItem[] = rows.map((r) => ({
              id: r.id,
@@ -53,116 +55,118 @@ export const useBudgetProcessor = () => {
              is_macro_item: r.is_macro_item,
              macro_etapa_pai: r.macro_etapa_pai,
              ai_status: r.ai_status || (r.is_macro_item ? '-' : 'PROCESSANDO'),
-             ai_justificativa: r.ai_justificativa || (r.is_macro_item ? '-' : 'Analisando via IA...')
+             ai_justificativa: r.ai_justificativa || (r.is_macro_item ? '-' : 'Aguardando processamento em nuvem...')
         }));
         
         pendingVisualUpdates.current = [];
         
-        // tableData do Zustand não estará super atualizado dentro desta closure 
-        // se não usarmos prev state ou lermos do store. Mas para simplificar 
-        // a migração cirúrgica, vamos usar o valor mais recente do estado
-        // Note: idealmente isso usaria zustand getState()
         const currentState = useBudgetStore.getState().tableData;
         let currentTableData = append ? [...currentState, ...initialItems] : initialItems;
         currentTableData = recalculateNumbers(currentTableData);
         
+        // Efeito Cascata: Monta o esqueleto IMEDIATAMENTE na tela!
         setTableData(currentTableData);
         
-        const chunkSize = 15;
-        let completed = 0;
+        // Prepara itens válidos para IA (ignora macros)
+        const validItems = rows.map(item => ({
+            id: item.id,
+            descricao: item.descricao,
+            quantidade: item.quantidade,
+            unidade: item.unidade,
+            valorUnit: item.valorUnit,
+            is_macro_item: item.is_macro_item,
+            macro_etapa_pai: item.macro_etapa_pai
+        }));
         
-        for (let i = 0; i < rows.length; i += chunkSize) {
-            while (isPausedRef.current) {
-                await new Promise(resolve => setTimeout(resolve, 500));
-            }
+        setProcessingStatusText('Enviando lote de processamento (SSE)...');
 
-            const chunk = rows.slice(i, i + chunkSize).map(item => ({
-                id: item.id,
-                descricao: item.descricao,
-                quantidade: item.quantidade,
-                unidade: item.unidade,
-                valorUnit: item.valorUnit,
-                is_macro_item: item.is_macro_item,
-                macro_etapa_pai: item.macro_etapa_pai
-            }));
+        try {
+            // Dispara o Job Unificado
+            const res = await fetch(`/api/orcamento/processar-job`, {
+                method: "POST",
+                headers: { 
+                    "Content-Type": "application/json",
+                    "x-api-key": process.env.NEXT_PUBLIC_API_KEY || "chave-secreta-padrao"
+                },
+                body: JSON.stringify({ itens: validItems }),
+            });
             
-            let retries = 3;
-            let success = false;
+            if (!res.ok) throw new Error("Falha ao despachar Job");
+            const data = await res.json();
+            const jobId = data.job_id;
             
-            while (retries > 0 && !success) {
-                try {
-                    const res = await fetch(`/api/orcamento/processar-lote-stateless`, {
-                        method: "POST",
-                        headers: { 
-                            "Content-Type": "application/json",
-                            "x-api-key": process.env.NEXT_PUBLIC_API_KEY || "chave-secreta-padrao"
-                        },
-                        body: JSON.stringify({ itens: chunk }),
-                    });
+            setProcessingStatusText('Buscando itens no banco de dados e SINAPI...');
+            let completed = 0;
+            const totalItems = validItems.filter(i => !i.is_macro_item).length;
+
+            // Inicia o túnel SSE
+            const eventSource = new EventSource(`/api/orcamento/stream/${jobId}`);
+            
+            eventSource.onmessage = (event) => {
+                const message = JSON.parse(event.data);
+                
+                if (message.type === 'item_processed') {
+                    completed += 1;
+                    setProcessedItemsCount(completed);
+                    setUploadProgress(Math.min(100, Math.round((completed / totalItems) * 100)));
+                    setProcessingStatusText(`Processando item ${completed} de ${totalItems}...`);
                     
-                    if (!res.ok) throw new Error("Erro na API");
+                    const resultRow = message.data;
+                    const resData = resultRow.resultado || {};
+                    const analise = resData.analise || {};
+                    const meta = resData.metadados || {};
+                    const isApproved = analise.status?.includes('ACEITO');
+                    const aiError = analise.erro || resData.erro || resultRow.erro;
+                    const aiStatus = (analise.status || resData.status || resultRow.status || 'ERRO');
                     
-                    const responseData = await res.json();
-                    
-                    if (responseData.resultados) {
-                        const updatedItemsMap = new Map();
+                    // Encontra o item base correspondente
+                    const oldItem = currentTableData.find(i => i.id === resultRow.id);
+                    if (oldItem) {
+                        const newItem = {
+                            ...oldItem,
+                            codigo: isApproved ? (meta.codigo || '-') : '-',
+                            base: isApproved ? "SINAPI" : "-",
+                            descricao: isApproved ? (meta.descricao || oldItem.descricao) : oldItem.descricao,
+                            descricao_legada: oldItem.descricao_legada || oldItem.descricao,
+                            und: isApproved ? (meta.unidade || '-') : '-',
+                            valorUnit: isApproved ? (meta.custo || 0.0) : 0.0,
+                            total: (isApproved ? (meta.custo || 0.0) : 0.0) * oldItem.quant,
+                            ai_status: aiStatus,
+                            ai_justificativa: analise.justificativa || resData.justificativa || aiError || 'Falha ao processar',
+                            memoria_calculo: resData.memoria_calculo || []
+                        };
                         
-                        currentTableData = currentTableData.map(oldItem => {
-                            const resultRow = responseData.resultados.find((r: any) => r.id === oldItem.id);
-                            if (!resultRow) return oldItem;
-                            
-                            const resData = resultRow.resultado || {};
-                            const analise = resData.analise || {};
-                            const meta = resData.metadados || {};
-                            const isApproved = analise.status?.includes('ACEITO');
-                            const aiError = analise.erro || resData.erro || resultRow.erro;
-                            const aiStatus = oldItem.is_macro_item ? '-' : (analise.status || resData.status || resultRow.status || 'ERRO');
-                            
-                            const newItem = {
-                                ...oldItem,
-                                codigo: oldItem.is_macro_item ? '-' : (isApproved ? (meta.codigo || '-') : '-'),
-                                base: oldItem.is_macro_item ? '-' : (isApproved ? "SINAPI" : "-"),
-                                descricao: oldItem.is_macro_item ? oldItem.descricao : (isApproved ? (meta.descricao || oldItem.descricao) : oldItem.descricao),
-                                descricao_legada: oldItem.descricao_legada || oldItem.descricao,
-                                und: oldItem.is_macro_item ? '-' : (isApproved ? (meta.unidade || '-') : '-'),
-                                valorUnit: oldItem.is_macro_item ? 0.0 : (isApproved ? (meta.custo || 0.0) : 0.0),
-                                total: oldItem.is_macro_item ? 0.0 : ((isApproved ? (meta.custo || 0.0) : 0.0) * oldItem.quant),
-                                ai_status: aiStatus,
-                                ai_justificativa: oldItem.is_macro_item ? '-' : (analise.justificativa || resData.justificativa || aiError || 'Falha ao processar'),
-                                memoria_calculo: resData.memoria_calculo || []
-                            };
-                            
-                            updatedItemsMap.set(newItem.id, newItem);
-                            return newItem;
-                        });
-                        
-                        pendingVisualUpdates.current.push(...Array.from(updatedItemsMap.values()));
-                    }
-                    success = true;
-                } catch (err) {
-                    retries--;
-                    if (retries === 0) {
-                        currentTableData = currentTableData.map(oldItem => {
-                             if (chunk.some(c => c.id === oldItem.id)) {
-                                 return { ...oldItem, ai_status: 'ERRO', ai_justificativa: 'Falha de conexão com a API' };
-                             }
-                             return oldItem;
-                        });
-                        setTableData([...currentTableData]);
-                    } else {
-                        await new Promise(resolve => setTimeout(resolve, (4 - retries) * 3000));
+                        // Joga na fila do Efeito Dominó
+                        pendingVisualUpdates.current.push(newItem);
                     }
                 }
-            }
+                
+                if (message.type === 'job_completed') {
+                    setProcessingStatusText('Calculando totais finais...');
+                    setUploadProgress(100);
+                    eventSource.close();
+                    
+                    setTimeout(() => {
+                        setIsProcessing(false);
+                        setUploadProgress(null);
+                        setProcessingStatusText('');
+                        setProcessedItemsCount(0);
+                    }, 1500);
+                }
+            };
             
-            completed += chunk.length;
-            setUploadProgress(Math.min(100, Math.round((completed / rows.length) * 100)));
-        }
-        
-        setTimeout(() => {
+            eventSource.onerror = (error) => {
+                console.error("SSE Error:", error);
+                eventSource.close();
+                setIsProcessing(false);
+                setProcessingStatusText('Erro na conexão SSE');
+            };
+
+        } catch (error) {
+            console.error("Erro no batch:", error);
             setIsProcessing(false);
-            setUploadProgress(null);
-        }, 1000);
+            setProcessingStatusText('Falha ao iniciar processamento');
+        }
     };
 
     const processFile = async (file: File, append: boolean) => {
