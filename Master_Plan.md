@@ -62,7 +62,7 @@
 > A tela da tabela deve continuar extremamente limpa. O Dashboard com Curva ABC e Insights deve ser criado em uma aba ou rota separada, não poluindo a área de trabalho da planilha.
 
 - [ ] **4.1 Virtualização de Tabela e Curva ABC:**
-  - [ ] Aplicar virtualização de DOM na `BudgetTable` usando `@tanstack/react-virtual` para renderização fluida de planilhas gigantes.
+  - [x] Aplicar virtualização de DOM na `BudgetTable` usando `@tanstack/react-virtual` para renderização fluida de planilhas gigantes.
   - [ ] Exibir painel com Curva ABC dinâmica em uma aba/rota separada.
   - [ ] Tratamento e agrupamento automático de serviços "órfãos" sem etapa definida sob "1.0 - Serviços Preliminares".
 
@@ -70,7 +70,7 @@
   - [ ] Criar um Copiloto Sidebar para que o usuário possa dar comandos em linguagem natural (ex: 'Altere o insumo X dessa linha').
 
 - [ ] **4.3 Detalhamento Analítico de Composições (Drawer Lateral):**
-  - [ ] Revisão de código (Code Review) no modal atual para garantir que o clique está consultando estritamente nosso banco de dados, sem disparar chamadas pagas à OpenAI.
+  - [x] Revisão de código (Code Review) no modal atual para garantir que o clique está consultando estritamente nosso banco de dados, sem disparar chamadas pagas à OpenAI.
 
 - [ ] **4.4 Edição Reativa e Catálogo do Projeto:**
   - [ ] Implementar modal de edição de composições (`CompositionEditorModal`) rodando recálculos matemáticos 100% no cliente (sem custo de API).
